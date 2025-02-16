@@ -1,4 +1,5 @@
 ﻿using AgentDo;
+using Amazon.Bedrock;
 using Amazon.BedrockRuntime;
 using CommandLine;
 using Microsoft.Extensions.Configuration;
@@ -28,10 +29,7 @@ using (var serviceScope = host.Services.CreateScope())
 			try
 			{
 				var methodArguments = actionInvocationMethod.GetParameters()
-					.Select(p =>
-					{
-						return serviceProvider.GetRequiredKeyedService(p.ParameterType, p.GetCustomAttribute<FromKeyedServicesAttribute>()?.Key);
-					})
+					.Select(p => serviceProvider.GetRequiredKeyedService(p.ParameterType, p.GetCustomAttribute<FromKeyedServicesAttribute>()?.Key))
 					.ToArray();
 
 				var result = actionInvocationMethod.Invoke(action, methodArguments);
@@ -78,14 +76,20 @@ static IHostBuilder CreateHostBuilder()
 		{
 			var config = ctx.Configuration;
 
-			services.AddSingleton<IAmazonBedrockRuntime>(sp =>
-			{
-				return new AmazonBedrockRuntimeClient(
-					awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
-					awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
-					region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!));
-			});
+			services.AddSingleton<IAmazonBedrock>(sp => new AmazonBedrockClient(
+				awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
+				awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
+				region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!)));
 
-			services.AddKeyedTransient<IAgent, BedrockAgent>("bedrock");
+			services.AddSingleton<IAmazonBedrockRuntime>(sp => new AmazonBedrockRuntimeClient(
+				awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
+				awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
+				region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!)));
+
+			services.AddKeyedSingleton<IAgent, BedrockAgent>("bedrock");
+			services.Configure<BedrockAgentOptions>(o =>
+			{
+				o.ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0";
+			});
 		});
 }

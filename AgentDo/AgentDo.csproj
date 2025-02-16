@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
-		<LangVersion>12.0</LangVersion>
+		<LangVersion>13.0</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<PackageId>AgentDo</PackageId>
@@ -23,6 +23,7 @@
 	<ItemGroup>
 		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.412.13" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.2" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.2" />
 		<PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
 	</ItemGroup>
 

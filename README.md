@@ -12,7 +12,11 @@ services.AddSingleton<IAmazonBedrockRuntime>(sp =>
 		region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!));
 });
 
-services.AddKeyedTransient<IAgent, BedrockAgent>("bedrock");
+services.AddKeyedSingleton<IAgent, BedrockAgent>("bedrock");
+services.Configure<BedrockAgentOptions>(o =>
+{
+	o.ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0";
+});
 ```
 
 Now you can get the agent injected and start it with `agent.Do(...)` by passing in the task and tools.

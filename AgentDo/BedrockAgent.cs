@@ -1,6 +1,7 @@
 ﻿using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
@@ -20,13 +21,16 @@ BUT, if one of the values for a required parameter is missing, DO NOT invoke the
 DO NOT ask for more information on optional parameters if it is not provided.
 ----
 ";
+
 		private readonly IAmazonBedrockRuntime bedrock;
 		private readonly ILogger<BedrockAgent> logger;
+		private readonly IOptions<BedrockAgentOptions> options;
 
-		public BedrockAgent(IAmazonBedrockRuntime bedrock, ILogger<BedrockAgent> logger)
+		public BedrockAgent(IAmazonBedrockRuntime bedrock, ILogger<BedrockAgent> logger, IOptions<BedrockAgentOptions> options)
 		{
 			this.bedrock = bedrock;
 			this.logger = logger;
+			this.options = options;
 		}
 
 		public async Task<List<Message>> Do(string task, List<Tool> tools, bool logTask = false)
@@ -41,10 +45,10 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			{
 				var response = await bedrock.ConverseAsync(new ConverseRequest
 				{
-					ModelId = "anthropic.claude-3-sonnet-20240229-v1:0",//TODO: config?
+					ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
 					Messages = messages,
 					ToolConfig = GetConfig(tools),
-					InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
+					InferenceConfig = new InferenceConfiguration() { Temperature = options.Value.Temperature ?? 0.0F }
 				});
 
 				var responseMessage = response.Output.Message;
@@ -58,12 +62,14 @@ DO NOT ask for more information on optional parameters if it is not provided.
 
 				if (response.StopReason == StopReason.Tool_use)
 				{
-					var toolUse = responseMessage.ToolUse();
-					logger.LogInformation("{Tool}: Invoking {ToolUse}...", toolUse.Name, toolUse.ToolUseId);
-
-					var toolResult = await Use(tools, toolUse, logger);
-
-					messages.Add(ConversationRole.User.Says(toolResult));
+					var toolsUse = responseMessage.ToolsUse();
+					var toolResults = new List<ToolResultBlock>();
+					foreach (var toolUse in toolsUse)
+					{
+						var toolResult = await Use(tools, toolUse, responseMessage.Role, logger);
+						toolResults.Add(toolResult);
+					}
+					messages.Add(ConversationRole.User.Says(toolResults));
 				}
 				else
 				{
@@ -120,13 +126,13 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			};
 		}
 
-		private static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ILogger logger)
+		private static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ConversationRole role, ILogger logger)
 		{
 			var toolToUse = tools.Single(tool => tool.Name == toolUse.Name);
-			return await Use(toolToUse, toolUse, logger);
+			return await Use(toolToUse, toolUse, role, logger);
 		}
 
-		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ILogger logger)
+		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ConversationRole role, ILogger logger)
 		{
 			var inputs = toolUse.Input.AsDictionary();
 
@@ -134,6 +140,8 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			var parameters = method.GetParameters()
 				.Select(p => (object?)(inputs.TryGetValue(p.Name ?? string.Empty, out var value) ? value.AsString() : default))
 				.ToArray();
+
+			logger.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, toolUse.Name, parameters);
 
 			var returnValue = tool.Delegate.DynamicInvoke(parameters);
 			object? result;
@@ -170,14 +178,14 @@ DO NOT ask for more information on optional parameters if it is not provided.
 	{
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ContentBlock content) => new() { Role = role, Content = [content] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
-		public static Amazon.BedrockRuntime.Model.Message Says (this ConversationRole role, string text) => new() { Role = role, Content = [new ContentBlock { Text = text }] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [.. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text) => new() { Role = role, Content = [new ContentBlock { Text = text }] };
 
 		public static string Text(this Amazon.BedrockRuntime.Model.Message message) => string.Concat(message.Content.Select(c => c.Text));
-		public static ToolUseBlock ToolUse(this Amazon.BedrockRuntime.Model.Message message)
+		public static IEnumerable<ToolUseBlock> ToolsUse(this Amazon.BedrockRuntime.Model.Message message)
 		{
 			var toolUses = message.Content.Select(c => c.ToolUse).Where(t => t != null);
-			var toolUse = toolUses.Single();//TODO: parallel function calls?
-			return toolUse;
+			return toolUses;
 		}
 	}
 }

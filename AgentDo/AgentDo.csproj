@@ -21,7 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.412.13" />
+		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.413" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.2" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.2" />
 		<PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />

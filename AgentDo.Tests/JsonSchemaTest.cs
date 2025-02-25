@@ -1,7 +1,9 @@
 ﻿using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
+using Amazon.Runtime.Internal.Transform;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
@@ -152,6 +154,33 @@ namespace AgentDo.Tests
 			{
 				Console.WriteLine(text);
 			}
+		}
+
+		[TestMethod]
+		public void DocumentMarshalling()
+		{
+			static Amazon.Runtime.Documents.Document unmarshall(string json)
+			{
+				using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+				using var context = new JsonUnmarshallerContext(stream, false, null);
+				var unmarshaller = Amazon.Runtime.Documents.Internal.Transform.DocumentUnmarshaller.Instance;
+				var unmarshalled = unmarshaller.Unmarshall(context);
+				return unmarshalled;
+			}
+
+			static string marshall(Amazon.Runtime.Documents.Document json)
+			{
+				var sb = new StringBuilder();
+				var jsonWriter = new ThirdParty.Json.LitJson.JsonWriter(sb);
+				Amazon.Runtime.Documents.Internal.Transform.DocumentMarshaller.Instance.Write(jsonWriter, json);
+				var marshalled = sb.ToString();
+				return marshalled;
+			}
+
+			var schema = options.GetJsonSchemaAsNode(typeof(Person), exporterOptions);
+			var schemaString = schema.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+
+			Assert.AreEqual(schemaString, marshall(unmarshall(schemaString)));
 		}
 	}
 }

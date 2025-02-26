@@ -145,22 +145,22 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			}
 		}
 
-		private static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ConversationRole role, ILogger logger)
+		public static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ConversationRole role, ILogger? logger)
 		{
 			var toolToUse = tools.Single(tool => tool.Name == toolUse.Name);
 			return await Use(toolToUse, toolUse, role, logger);
 		}
 
-		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ConversationRole role, ILogger logger)
+		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ConversationRole role, ILogger? logger)
 		{
 			var inputs = toolUse.Input.AsDictionary();
 
 			var method = tool.Delegate.GetMethodInfo();
 			var parameters = method.GetParameters()
-				.Select(p => (object?)(inputs.TryGetValue(p.Name ?? string.Empty, out var value) ? value.AsString() : default))
+				.Select(p => inputs.TryGetValue(p.Name ?? string.Empty, out var value) ? value.FromAmazonJson(p.ParameterType) : default)
 				.ToArray();
 
-			logger.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, toolUse.Name, parameters);
+			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, toolUse.Name, parameters);
 
 			var returnValue = tool.Delegate.DynamicInvoke(parameters);
 			object? result;
@@ -174,7 +174,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				result = returnValue;
 			}
 
-			logger.LogInformation("{Tool}: {@Result}", toolUse.ToolUseId, result);
+			logger?.LogInformation("{Tool}: {@Result}", toolUse.ToolUseId, result);
 
 			return new ToolResultBlock
 			{

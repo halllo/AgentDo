@@ -106,7 +106,7 @@ namespace AgentDo.Tests
 		}
 
 		[TestMethod]
-		public void AmazonJsonMarshalling()
+		public void AmazonJsonMarshallingObject()
 		{
 			var schemaString = JsonSchemaExtensions.JsonSchemaString<Person>();
 

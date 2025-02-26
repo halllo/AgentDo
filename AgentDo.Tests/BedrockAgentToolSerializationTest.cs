@@ -195,41 +195,34 @@ namespace AgentDo.Tests
 				}
 			};
 
-			var usableTool = Tool.From([Description("Rate a song")] (Song song, int rating) => "Rated!");
+			SongRating? toolCall = null;
+			var usableTool = Tool.From([Description("Rate a song")] (Song song, int rating) =>
+			{
+				toolCall = new SongRating(song, rating);
+				return "Rated!";
+			});
 			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
 			AssertEqual(expectedTool, bedrockTool);
 
-			//Actually processing it
+			//Actually processing it as json
 			var response = await bedrock.ConverseWithTool("I would like to rate the sone All Too Well by Taylor Swift with 1.", bedrockTool);
-			var songRating = response.Output.Message.Content[1].ToolUse.Input.FromAmazonJson<SongRating>()!;
+			var toolUse = response.Output.Message.Content[1].ToolUse;
+			var songRating = toolUse.Input.FromAmazonJson<SongRating>()!;
 			Assert.AreEqual("Taylor Swift", songRating.Song.Artist.Name);
 			Assert.AreEqual("abc", songRating.Song.Artist.Pseudonym);
 			Assert.AreEqual("All Too Well", songRating.Song.Name);
 			Assert.AreEqual(1, songRating.Rating);
+
+			//Actually processing it though the bedrock agent tool
+			var toolResult = await BedrockAgent.Use([usableTool], toolUse, ConversationRole.Assistant, null);
+			Assert.AreEqual("Taylor Swift", toolCall!.Song.Artist.Name);
+			Assert.AreEqual("abc", toolCall!.Song.Artist.Pseudonym);
+			Assert.AreEqual("All Too Well", toolCall!.Song.Name);
+			Assert.AreEqual(1, toolCall!.Rating);
 		}
 		record Song(Artist Artist, string Name, decimal Length);
 		record Artist(string Name, string Pseudonym = "abc");
 		record SongRating(Song Song, int Rating);
-
-		[TestMethodWithDI]
-		public async Task NestedObjectWithNullableProperty(IAmazonBedrockRuntime bedrock)
-		{
-			var usableTool = Tool.From([Description("Detect Album")] (Album album) => "");
-			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
-
-			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift.", bedrockTool);
-			var recognized = response.Output.Message.Content[1].ToolUse.Input.FromAmazonJson<RecognizedAlbum>()!;
-			Console.WriteLine(JsonSerializer.Serialize(recognized));
-
-			Assert.AreEqual("Taylor Swift", recognized.Album.Artist.Name);
-			Assert.AreEqual("abc", recognized.Album.Artist.Pseudonym);
-			Assert.AreEqual("RED", recognized.Album.Name);
-			Assert.IsNull(recognized.Album.CustomAlias);
-		}
-		record Album(Artist Artist, string Name, string? CustomAlias = null);
-		record RecognizedAlbum(Album Album);
-
-
 
 		private static void AssertEqual(Amazon.BedrockRuntime.Model.Tool expected, Amazon.BedrockRuntime.Model.Tool actual)
 		{
@@ -241,5 +234,38 @@ namespace AgentDo.Tests
 				actual: actual.ToolSpec.InputSchema.Json.FromAmazonJson(),
 				message: "'inputSchema' mismatch");
 		}
+
+		[TestMethodWithDI]
+		public async Task PrimitivesAndNestedObjectWithNullableProperty(IAmazonBedrockRuntime bedrock)
+		{
+			RecognizedAlbum? toolCall = null;
+			var usableTool = Tool.From([Description("Detect Album")] (Album album, decimal price, string clerk, bool inStock, int purchaseCounter) =>
+			{
+				toolCall = new RecognizedAlbum(album, price, clerk, inStock, purchaseCounter);
+				return "";
+			});
+			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
+
+			//Actually processing it as json
+			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift. It was already bought three times.", bedrockTool);
+			var toolUse = response.Output.Message.Content[1].ToolUse;
+			var recognized = toolUse.Input.FromAmazonJson<RecognizedAlbum>()!;
+			Console.WriteLine(JsonSerializer.Serialize(recognized));
+			Assert.AreEqual("Taylor Swift", recognized.Album.Artist.Name);
+			Assert.AreEqual("RED", recognized.Album.Name);
+			Assert.IsNull(recognized.Album.CustomAlias);
+
+			//Actually processing it though the bedrock agent tool
+			var toolResult = await BedrockAgent.Use([usableTool], toolUse, ConversationRole.Assistant, null);
+			Assert.AreEqual("Taylor Swift", toolCall!.Album.Artist.Name);
+			Assert.AreEqual("RED", toolCall!.Album.Name);
+			Assert.IsNull(toolCall!.Album.CustomAlias);
+			Assert.AreEqual(recognized.Price, toolCall!.Price);
+			Assert.AreEqual(recognized.Clerk, toolCall!.Clerk);
+			Assert.AreEqual(recognized.InStock, toolCall!.InStock);
+			Assert.AreEqual(recognized.PurchaseCounter, toolCall!.PurchaseCounter);
+		}
+		record Album(Artist Artist, string Name, string? CustomAlias = null);
+		record RecognizedAlbum(Album Album, decimal Price, string Clerk, bool InStock, int PurchaseCounter);
 	}
 }

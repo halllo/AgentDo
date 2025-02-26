@@ -1,7 +1,6 @@
 ﻿using Amazon.Runtime.Documents;
 using Amazon.Runtime.Documents.Internal.Transform;
 using Amazon.Runtime.Internal.Transform;
-using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
@@ -65,6 +64,11 @@ namespace AgentDo
 			WriteIndented = false,
 		};
 
+		static JsonSerializerOptions deserializationOptions = new(JsonSerializerOptions.Default)
+		{
+			PropertyNameCaseInsensitive = true
+		};
+
 		public static string JsonSchemaString<T>() => JsonSchemaString(typeof(T));
 		public static string JsonSchemaString(Type type, string? description = null)
 		{
@@ -96,18 +100,40 @@ namespace AgentDo
 
 		public static string FromAmazonJson(this Document amazonJson)
 		{
-			var sb = new StringBuilder();
-			var jsonWriter = new JsonWriter(sb);
-			DocumentMarshaller.Instance.Write(jsonWriter, amazonJson);
-			var marshalled = sb.ToString();
-			return marshalled;
+			if (amazonJson.IsDictionary() || amazonJson.IsList())
+			{
+				var sb = new StringBuilder();
+				var jsonWriter = new JsonWriter(sb);
+				DocumentMarshaller.Instance.Write(jsonWriter, amazonJson);
+				var marshalled = sb.ToString();
+				return marshalled;
+			}
+			else
+			{
+				throw new NotSupportedException("Only dictionaries and lists can be marshalled.");
+			}
 		}
 
 		public static T? FromAmazonJson<T>(this Document amazonJson)
 		{
 			var json = FromAmazonJson(amazonJson);
-			var t = JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+			var t = JsonSerializer.Deserialize<T>(json, deserializationOptions);
 			return t;
+		}
+
+		public static object? FromAmazonJson(this Document amazonJson, Type type)
+		{
+			if (amazonJson.IsBool()) return Convert.ChangeType(amazonJson.AsBool(), type);
+			else if (amazonJson.IsInt()) return Convert.ChangeType(amazonJson.AsInt(), type);
+			else if (amazonJson.IsLong()) return Convert.ChangeType(amazonJson.AsLong(), type);
+			else if (amazonJson.IsDouble()) return Convert.ChangeType(amazonJson.AsDouble(), type);
+			else if (amazonJson.IsString()) return Convert.ChangeType(amazonJson.AsString(), type);
+			else
+			{
+				var json = FromAmazonJson(amazonJson);
+				var t = JsonSerializer.Deserialize(json, type, deserializationOptions);
+				return t;
+			}
 		}
 	}
 }

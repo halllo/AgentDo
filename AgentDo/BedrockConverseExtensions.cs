@@ -28,10 +28,8 @@ namespace AgentDo
 			{
 				ModelId = modelId,
 				Messages = messages,
-				ToolConfig = new ToolConfiguration
-				{
-					Tools = [tool]
-				}
+				ToolConfig = new ToolConfiguration { Tools = [tool] },
+				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 
 			return response;

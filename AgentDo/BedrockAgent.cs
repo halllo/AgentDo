@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json.Nodes;
 
 namespace AgentDo
 {
@@ -94,13 +95,9 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			var methodParameters = method.GetParameters();
 			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
 			{
-				Type = p.ParameterType.Name.ToLowerInvariant() switch
-				{
-					"string" => "string",
-					string type => throw new ArgumentOutOfRangeException($"'{type}' parameters are not supported by bedrock json yet."),
-				},
-				Description = p.GetCustomAttribute<DescriptionAttribute>()?.Description ?? p.Name,
-				Required = p.GetCustomAttribute<RequiredAttribute>() != null,
+				Type = p.ParameterType,
+				Description = p.GetCustomAttribute<DescriptionAttribute>()?.Description,
+				Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
 			});
 
 			return new Amazon.BedrockRuntime.Model.Tool
@@ -111,19 +108,41 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					Description = methodDescription,
 					InputSchema = new ToolInputSchema
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
+						Json = JsonSchemaExtensions.ToAmazonJson(new JsonObject
 						{
-							type = "object",
-							properties = toolPropertiesDictionary.ToDictionary(p => p.Key, p => new
-							{
-								type = p.Value.Type,
-								description = p.Value.Description,
-							}),
-							required = toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => kvp.Key).ToArray(),
+							["type"] = "object",
+							["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
+								key: p.Key,
+								value: JsonSchemaExtensions.JsonSchema(p.Value.Type, p.Value.Description)))),
+							["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
 						}),
 					},
 				}
 			};
+
+			///copilot generated, not sure if it's correct
+			static bool IsNullable(ParameterInfo parameter)
+			{
+				if (parameter.ParameterType.IsValueType)
+				{
+					return Nullable.GetUnderlyingType(parameter.ParameterType) != null;
+				}
+
+				var nullableAttribute = parameter.GetCustomAttributes()
+					.FirstOrDefault(attr => attr.GetType().FullName == "System.Runtime.CompilerServices.NullableAttribute");
+
+				if (nullableAttribute != null)
+				{
+					var field = nullableAttribute.GetType().GetField("NullableFlags");
+					if (field != null)
+					{
+						var flags = (byte[])field.GetValue(nullableAttribute);
+						return flags[0] == 2;
+					}
+				}
+
+				return false;
+			}
 		}
 
 		private static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ConversationRole role, ILogger logger)
@@ -163,29 +182,14 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				Content =
 				[
 					new ToolResultContentBlock
+					{
+						Json = Amazon.Runtime.Documents.Document.FromObject(new
 						{
-							Json = Amazon.Runtime.Documents.Document.FromObject(new
-							{
-								result
-							}),
-						}
+							result
+						}),
+					}
 				]
 			};
-		}
-	}
-
-	file static class BedrockAgentExtensions
-	{
-		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ContentBlock content) => new() { Role = role, Content = [content] };
-		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
-		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [.. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
-		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text) => new() { Role = role, Content = [new ContentBlock { Text = text }] };
-
-		public static string Text(this Amazon.BedrockRuntime.Model.Message message) => string.Concat(message.Content.Select(c => c.Text));
-		public static IEnumerable<ToolUseBlock> ToolsUse(this Amazon.BedrockRuntime.Model.Message message)
-		{
-			var toolUses = message.Content.Select(c => c.ToolUse).Where(t => t != null);
-			return toolUses;
 		}
 	}
 }

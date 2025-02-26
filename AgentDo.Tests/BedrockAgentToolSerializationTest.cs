@@ -1,7 +1,7 @@
-﻿using Amazon.BedrockRuntime.Model;
+﻿using Amazon.BedrockRuntime;
+using Amazon.BedrockRuntime.Model;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using ThirdParty.Json.LitJson;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests
@@ -56,7 +56,7 @@ namespace AgentDo.Tests
 			var rateSongTool = [Description("Rate a song")]
 			(
 				[Description("The song name"), Required] string song,
-				[Required] string rating
+				[Required] int rating
 			) => "Rated!";
 
 			var expectedTool = new Amazon.BedrockRuntime.Model.Tool
@@ -77,8 +77,7 @@ namespace AgentDo.Tests
 									description = "The song name"
 								} },
 								{ "rating", new {
-									type = "string",
-									description = "rating"
+									type = "integer"
 								} },
 							},
 							required = new string[]
@@ -111,50 +110,136 @@ namespace AgentDo.Tests
 							properties = new Dictionary<string, object>
 							{
 								{ "song", new {
-									type = "string",
-									description = "song"
+									type = "string"
 								} },
 								{ "rating", new {
-									type = "string",
-									description = "rating"
+									type = "string"
 								} },
 							},
 							required = new string[]
 							{
+								"song"
 							},
 						}),
 					},
 				}
 			};
 
-			var usableTool = Tool.From([Description("Rate a song")] (string song, string rating) => "Rated!");
+			var usableTool = Tool.From([Description("Rate a song")] (string song, string? rating) => "Rated!");
 
 			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(usableTool));
 		}
+
+		[TestMethodWithDI]
+		public async Task NestedObject(IAmazonBedrockRuntime bedrock)
+		{
+			var expectedTool = new Amazon.BedrockRuntime.Model.Tool
+			{
+				ToolSpec = new ToolSpecification
+				{
+					Name = "RateASong",
+					Description = "Rate a song",
+					InputSchema = new ToolInputSchema
+					{
+						Json = Amazon.Runtime.Documents.Document.FromObject(new
+						{
+							type = "object",
+							properties = new Dictionary<string, object>
+							{
+								{ "song", new {
+									type = "object",
+									properties = new Dictionary<string, object>
+									{
+										{ "artist", new {
+											type = "object",
+											properties = new Dictionary<string, object>
+											{
+												{ "name", new {
+													type = "string"
+												} },
+												{ "pseudonym", new Dictionary<string, object?> {
+													{ "type", "string" },
+													{ "default", "abc" },
+												} },
+											},
+											required = new string[]
+											{
+												"name"
+											},
+										} },
+										{ "name", new {
+											type = "string"
+										} },
+										{ "length", new {
+											type = "number"
+										} },
+									},
+									required = new string[]
+									{
+										"artist",
+										"name",
+										"length"
+									},
+								} },
+								{ "rating", new {
+									type = "integer"
+								} },
+							},
+							required = new string[]
+							{
+								"song",
+								"rating"
+							},
+						}),
+					},
+				}
+			};
+
+			var usableTool = Tool.From([Description("Rate a song")] (Song song, int rating) => "Rated!");
+			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
+			AssertEqual(expectedTool, bedrockTool);
+
+			//Actually processing it
+			var response = await bedrock.ConverseWithTool("I would like to rate the sone All Too Well by Taylor Swift with 1.", bedrockTool);
+			var songRating = response.Output.Message.Content[1].ToolUse.Input.FromAmazonJson<SongRating>()!;
+			Assert.AreEqual("Taylor Swift", songRating.Song.Artist.Name);
+			Assert.AreEqual("abc", songRating.Song.Artist.Pseudonym);
+			Assert.AreEqual("All Too Well", songRating.Song.Name);
+			Assert.AreEqual(1, songRating.Rating);
+		}
+		record Song(Artist Artist, string Name, decimal Length);
+		record Artist(string Name, string Pseudonym = "abc");
+		record SongRating(Song Song, int Rating);
+
+		[TestMethodWithDI]
+		public async Task NestedObjectWithNullableProperty(IAmazonBedrockRuntime bedrock)
+		{
+			var usableTool = Tool.From([Description("Detect Album")] (Album album) => "");
+			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
+
+			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift.", bedrockTool);
+			var recognized = response.Output.Message.Content[1].ToolUse.Input.FromAmazonJson<RecognizedAlbum>()!;
+			Console.WriteLine(JsonSerializer.Serialize(recognized));
+
+			Assert.AreEqual("Taylor Swift", recognized.Album.Artist.Name);
+			Assert.AreEqual("abc", recognized.Album.Artist.Pseudonym);
+			Assert.AreEqual("RED", recognized.Album.Name);
+			Assert.IsNull(recognized.Album.CustomAlias);
+		}
+		record Album(Artist Artist, string Name, string? CustomAlias = null);
+		record RecognizedAlbum(Album Album);
+
+
 
 		private static void AssertEqual(Amazon.BedrockRuntime.Model.Tool expected, Amazon.BedrockRuntime.Model.Tool actual)
 		{
 			Assert.AreEqual(expected.ToolSpec.Name, actual.ToolSpec.Name, "'name' mismatch");
 			Assert.AreEqual(expected.ToolSpec.Description, actual.ToolSpec.Description, "'description' mismatch");
 
-			var expectedInputSchema = expected.ToolSpec.InputSchema.Json.AsDictionary();
-			var actualInputSchema = actual.ToolSpec.InputSchema.Json.AsDictionary();
-			Assert.AreEqual(JsonMapper.ToJson(expectedInputSchema), JsonMapper.ToJson(actualInputSchema), "'inputSchema' mismatch");
-			Assert.AreEqual(expectedInputSchema["type"], actualInputSchema["type"], "'type' mismatch");
-
-			var expectedInputProperties = expectedInputSchema["properties"].AsDictionary();
-			var actualInputProperties = actualInputSchema["properties"].AsDictionary();
-			Assert.AreEqual(JsonMapper.ToJson(expectedInputProperties), JsonMapper.ToJson(actualInputProperties), "'properties' mismatch");
-			foreach (var property in expectedInputProperties)
-			{
-				var expectedValue = property.Value.AsDictionary().ToDictionary(v => v.Key, v => v.Value.ToString());
-				var actualValue = actualInputProperties[property.Key].AsDictionary().ToDictionary(v => v.Key, v => v.Value.ToString());
-				Assert.AreEqual(JsonSerializer.Serialize(expectedValue), JsonSerializer.Serialize(actualValue), $"property '{property.Key}' mismatch");
-			}
-
-			var expectedInputRequired = expectedInputSchema["required"].AsList().Select(d => d.AsString()).ToList();
-			var actualInputRequired = actualInputSchema["required"].AsList().Select(d => d.AsString()).ToList();
-			CollectionAssert.AreEqual(expectedInputRequired, actualInputRequired, "'required' mismatch");
+			Assert.AreEqual(
+				expected: expected.ToolSpec.InputSchema.Json.FromAmazonJson(),
+				actual: actual.ToolSpec.InputSchema.Json.FromAmazonJson(),
+				message: "'inputSchema' mismatch");
 		}
 	}
 }

@@ -124,7 +124,7 @@ namespace AgentDo.Tests
 		[TestMethod]
 		public void JsonSchemaOfPrimitiveWithDescription()
 		{
-			var schemaString = JsonSchemaExtensions.JsonSchemaString(typeof(int), description: "This is a number.");
+			var schemaString = typeof(int).ToJsonSchemaString(description: "This is a number.");
 
 			Assert.AreEqual("""{"type":"integer","description":"This is a number."}""", schemaString);
 		}

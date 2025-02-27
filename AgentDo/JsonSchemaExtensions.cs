@@ -69,14 +69,14 @@ namespace AgentDo
 			PropertyNameCaseInsensitive = true
 		};
 
-		public static string JsonSchemaString<T>() => JsonSchemaString(typeof(T));
-		public static string JsonSchemaString(Type type, string? description = null)
+		public static string JsonSchemaString<T>() => typeof(T).ToJsonSchemaString();
+		public static string ToJsonSchemaString(this Type type, string? description = null)
 		{
-			var schema = JsonSchema(type, description);
+			var schema = type.ToJsonSchema(description);
 			var schemaString = schema.ToJsonString(outputOptions);
 			return schemaString;
 		}
-		public static JsonNode JsonSchema(Type type, string? description = null)
+		public static JsonNode ToJsonSchema(this Type type, string? description = null)
 		{
 			var schema = generationOptions.GetJsonSchemaAsNode(type, exporterOptions);
 			if (!string.IsNullOrWhiteSpace(description))
@@ -121,18 +121,16 @@ namespace AgentDo
 			return t;
 		}
 
-		public static object? FromAmazonJson(this Document amazonJson, Type type)
+		public static object? As(this JsonNode? json, Type type)
 		{
-			if (amazonJson.IsBool()) return Convert.ChangeType(amazonJson.AsBool(), type);
-			else if (amazonJson.IsInt()) return Convert.ChangeType(amazonJson.AsInt(), type);
-			else if (amazonJson.IsLong()) return Convert.ChangeType(amazonJson.AsLong(), type);
-			else if (amazonJson.IsDouble()) return Convert.ChangeType(amazonJson.AsDouble(), type);
-			else if (amazonJson.IsString()) return Convert.ChangeType(amazonJson.AsString(), type);
+			if (json != null)
+			{
+				var t = json.Deserialize(type, deserializationOptions);
+				return t;
+			}
 			else
 			{
-				var json = FromAmazonJson(amazonJson);
-				var t = JsonSerializer.Deserialize(json, type, deserializationOptions);
-				return t;
+				return null;
 			}
 		}
 	}

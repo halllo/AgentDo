@@ -113,7 +113,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 							["type"] = "object",
 							["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
 								key: p.Key,
-								value: JsonSchemaExtensions.JsonSchema(p.Value.Type, p.Value.Description)))),
+								value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
 							["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
 						}),
 					},
@@ -153,11 +153,11 @@ DO NOT ask for more information on optional parameters if it is not provided.
 
 		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ConversationRole role, ILogger? logger)
 		{
-			var inputs = toolUse.Input.AsDictionary();
+			var inputs = toolUse.Input.FromAmazonJson<JsonObject>()!;
 
 			var method = tool.Delegate.GetMethodInfo();
 			var parameters = method.GetParameters()
-				.Select(p => inputs.TryGetValue(p.Name ?? string.Empty, out var value) ? value.FromAmazonJson(p.ParameterType) : default)
+				.Select(p => inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType) : default)
 				.ToArray();
 
 			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, toolUse.Name, parameters);

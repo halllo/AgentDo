@@ -1,0 +1,61 @@
+﻿using Amazon.BedrockRuntime;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
+
+namespace AgentDo.Tests
+{
+	[TestClass]
+	public sealed class Abstraction3Test
+	{
+		record Person(
+			[property: System.ComponentModel.Description("The full name  of the person.")] 
+			string Name,	
+			
+			[property: System.ComponentModel.Description("""
+			The age of the person at the current day.
+			If it needs calculation, pay close attention if the birthday of the current year has already occured or not.
+			""")]
+			int Age,
+			
+			[property: System.ComponentModel.Description("Where the person lives.")] 
+			Address? Address = null);
+
+		record Address(string City, string? Street = null);
+
+		[TestMethodWithDI]
+		public async Task BedrockConverseWithReflectedToolAndReflectedResponse(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			var agent = new BedrockAgent(
+				bedrock: bedrock,
+				logger: loggerFactory.CreateLogger<BedrockAgent>(),
+				options: Options.Create(new BedrockAgentOptions
+				{
+					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+					Temperature = 0.0F
+				}));
+
+			Person? registeredPerson = default;
+			var messages = await agent.Do(
+				task: "I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.",
+				tools:
+				[
+					Tool.From([System.ComponentModel.Description("Register person.")] (Person person) =>
+					{
+						registeredPerson = person;
+						return "registered";
+					}),
+
+					Tool.From([System.ComponentModel.Description("Get today.")]() => $"{DateTime.Today:dd MMMM yyyy}"),
+				]);
+
+			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Assert.IsNotNull(registeredPerson);
+			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
+			Assert.AreEqual(38, registeredPerson.Age);
+			Assert.IsNotNull(registeredPerson.Address);
+			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
+			Assert.IsNull(registeredPerson.Address!.Street);
+		}
+	}
+}

@@ -88,7 +88,7 @@ namespace AgentDo
 			return schema;
 		}
 
-		public static Document ToAmazonJson(this JsonObject json) => ToAmazonJson(json.ToJsonString(outputOptions));
+		public static Document ToAmazonJson(this JsonNode json) => ToAmazonJson(json.ToJsonString(outputOptions));
 		public static Document ToAmazonJson(this string json)
 		{
 			using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));

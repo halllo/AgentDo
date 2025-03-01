@@ -12,6 +12,10 @@ namespace AgentDo.Tests
 	[TestClass]
 	public sealed class BedrockAgentToolSerializationTest
 	{
+		record GetRadioSongTool(
+			[property: System.ComponentModel.Description("The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ and WKRP.")]
+			string Sign);
+
 		[TestMethod]
 		public void StringToString()
 		{
@@ -28,27 +32,19 @@ namespace AgentDo.Tests
 					Description = "Gets the current song on the radio",
 					InputSchema = new ToolInputSchema
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
-						{
-							type = "object",
-							properties = new Dictionary<string, object>
-							{
-								{ "sign", new {
-									type = "string",
-									description = "The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ and WKRP."
-								} }
-							},
-							required = new string[]
-							{
-								"sign"
-							},
-						}),
+						Json = typeof(GetRadioSongTool).ToJsonSchema().ToAmazonJson(),
 					},
 				}
 			};
 
 			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(Tool.From(getSongTool)));
 		}
+
+
+		record RateSongTool(
+			[property: System.ComponentModel.Description("The song name")] string Song,
+			int Rating
+			);
 
 		[TestMethod]
 		public void StringAndIntToString()
@@ -67,25 +63,7 @@ namespace AgentDo.Tests
 					Description = "Rate a song",
 					InputSchema = new ToolInputSchema
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
-						{
-							type = "object",
-							properties = new Dictionary<string, object>
-							{
-								{ "song", new {
-									type = "string",
-									description = "The song name"
-								} },
-								{ "rating", new {
-									type = "integer"
-								} },
-							},
-							required = new string[]
-							{
-								"song",
-								"rating"
-							},
-						}),
+						Json = typeof(RateSongTool).ToJsonSchema().ToAmazonJson(),
 					},
 				}
 			};
@@ -104,34 +82,26 @@ namespace AgentDo.Tests
 					Description = "Rate a song",
 					InputSchema = new ToolInputSchema
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
-						{
-							type = "object",
-							properties = new Dictionary<string, object>
-							{
-								{ "song", new {
-									type = "string"
-								} },
-								{ "rating", new {
-									type = "string"
-								} },
-							},
-							required = new string[]
-							{
-								"song"
-							},
-						}),
+						Json = typeof(RateSongTool).ToJsonSchema().ToAmazonJson(),
 					},
 				}
 			};
 
-			var usableTool = Tool.From([Description("Rate a song")] (string song, string? rating) => "Rated!");
+			var usableTool = Tool.From([Description("Rate a song")] (
+				[System.ComponentModel.Description("The song name")] string song,
+				int rating
+			) => "Rated!");
 
 			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(usableTool));
 		}
 
+
+		record RateSongToolWithNestedObjects(Song Song, int Rating);
+		record Song(Artist Artist, string Name, decimal Length);
+		record Artist(string Name, string Pseudonym = "abc");
+
 		[TestMethodWithDI]
-		public async Task NestedObject(IAmazonBedrockRuntime bedrock)
+		public async Task NestedObjects(IAmazonBedrockRuntime bedrock)
 		{
 			var expectedTool = new Amazon.BedrockRuntime.Model.Tool
 			{
@@ -141,64 +111,15 @@ namespace AgentDo.Tests
 					Description = "Rate a song",
 					InputSchema = new ToolInputSchema
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
-						{
-							type = "object",
-							properties = new Dictionary<string, object>
-							{
-								{ "song", new {
-									type = "object",
-									properties = new Dictionary<string, object>
-									{
-										{ "artist", new {
-											type = "object",
-											properties = new Dictionary<string, object>
-											{
-												{ "name", new {
-													type = "string"
-												} },
-												{ "pseudonym", new Dictionary<string, object?> {
-													{ "type", "string" },
-													{ "default", "abc" },
-												} },
-											},
-											required = new string[]
-											{
-												"name"
-											},
-										} },
-										{ "name", new {
-											type = "string"
-										} },
-										{ "length", new {
-											type = "number"
-										} },
-									},
-									required = new string[]
-									{
-										"artist",
-										"name",
-										"length"
-									},
-								} },
-								{ "rating", new {
-									type = "integer"
-								} },
-							},
-							required = new string[]
-							{
-								"song",
-								"rating"
-							},
-						}),
+						Json = typeof(RateSongToolWithNestedObjects).ToJsonSchema().ToAmazonJson(),
 					},
 				}
 			};
 
-			SongRating? toolCall = null;
+			RateSongToolWithNestedObjects? toolCall = null;
 			var usableTool = Tool.From([Description("Rate a song")] (Song song, int rating) =>
 			{
-				toolCall = new SongRating(song, rating);
+				toolCall = new RateSongToolWithNestedObjects(song, rating);
 				return "Rated!";
 			});
 			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
@@ -207,7 +128,7 @@ namespace AgentDo.Tests
 			//Actually processing it as json
 			var response = await bedrock.ConverseWithTool("I would like to rate the sone All Too Well by Taylor Swift with 1.", bedrockTool);
 			var toolUse = response.Output.Message.Content[1].ToolUse;
-			var songRating = toolUse.Input.FromAmazonJson<SongRating>()!;
+			var songRating = toolUse.Input.FromAmazonJson<RateSongToolWithNestedObjects>()!;
 			Assert.AreEqual("Taylor Swift", songRating.Song.Artist.Name);
 			Assert.AreEqual("abc", songRating.Song.Artist.Pseudonym);
 			Assert.AreEqual("All Too Well", songRating.Song.Name);
@@ -220,9 +141,7 @@ namespace AgentDo.Tests
 			Assert.AreEqual("All Too Well", toolCall!.Song.Name);
 			Assert.AreEqual(1, toolCall!.Rating);
 		}
-		record Song(Artist Artist, string Name, decimal Length);
-		record Artist(string Name, string Pseudonym = "abc");
-		record SongRating(Song Song, int Rating);
+
 
 		private static void AssertEqual(Amazon.BedrockRuntime.Model.Tool expected, Amazon.BedrockRuntime.Model.Tool actual)
 		{

@@ -17,6 +17,12 @@ namespace AgentDo
 			return toolUses;
 		}
 
+		public static IEnumerable<ToolResultBlock> ToolsResult(this Amazon.BedrockRuntime.Model.Message message)
+		{
+			var toolResults = message.Content.Select(c => c.ToolResult).Where(t => t != null);
+			return toolResults;
+		}
+
 		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = "anthropic.claude-3-sonnet-20240229-v1:0")
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>

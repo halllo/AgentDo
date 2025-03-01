@@ -20,6 +20,8 @@ namespace AgentDo.Tests
 			var config = builder.Build();
 
 			var services = new ServiceCollection();
+			services.AddLogging();
+
 			services.AddSingleton<IAmazonBedrockRuntime>(sp => new AmazonBedrockRuntimeClient(
 				awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
 				awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
@@ -38,15 +40,13 @@ namespace AgentDo.Tests
 			var nParameters = testMethod.ParameterTypes?.Length ?? 0;
 			if (nParameters != 0)
 			{
-				var injectedArgs = new object[nParameters];
 				var serviceProvider = TestMethodWithDI.serviceProvider;
 				using (var scope = serviceProvider!.CreateScope())
 				{
-					for (int i = 0; i < nParameters; i++)
-					{
-						var parameterType = testMethod.ParameterTypes![i].ParameterType;
-						injectedArgs[i] = scope.ServiceProvider.GetService(parameterType)!;
-					}
+					var injectedArgs = testMethod.ParameterTypes!
+						.Select(parameter => scope.ServiceProvider.GetRequiredService(parameter.ParameterType))
+						.ToArray();
+
 					return [testMethod.Invoke(injectedArgs)];
 				}
 			}

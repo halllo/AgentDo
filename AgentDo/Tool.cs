@@ -23,6 +23,10 @@ namespace AgentDo
 			if (toolName.Contains(' ') || toolName.Contains('.'))
 			{
 				var displayName = tool.GetMethodInfo().GetCustomAttribute<DescriptionAttribute>()?.Description;
+				if (string.IsNullOrWhiteSpace(displayName))
+				{
+					throw new NotSupportedException("Tool needs a proper name. Use toolName or DescriptionAttribute.");
+				}
 				actualToolName = Regex.Replace(displayName!, @"[^a-zA-Z0-9]+(.)", m => m.Groups[1].Value.ToUpper()).Trim(' ').Trim('.');
 			}
 			else

@@ -79,8 +79,16 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			}
 
 			return messages
-				.Select(m => new MessageAdapter<Amazon.BedrockRuntime.Model.Message>(m.Role.Value, m.Text(), m))
-				.ToList<Message>();
+				.Select(m =>
+				{
+					return new Message(
+						role: m.Role.Value,
+						text: m.Text(),
+						toolCalls: m.ToolsUse().Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson())).ToArray(),
+						toolResults: m.ToolsResult().Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson())).ToArray()
+					);
+				})
+				.ToList();
 		}
 
 		private static ToolConfiguration GetConfig(IEnumerable<Tool> tools) => new ToolConfiguration

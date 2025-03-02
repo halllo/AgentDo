@@ -1,4 +1,4 @@
-﻿namespace AgentDo
+﻿namespace AgentDo.Bedrock
 {
 	public class BedrockAgentOptions
 	{

@@ -1,4 +1,5 @@
 ﻿using AgentDo;
+using AgentDo.Bedrock;
 using Amazon.Bedrock;
 using Amazon.BedrockRuntime;
 using CommandLine;

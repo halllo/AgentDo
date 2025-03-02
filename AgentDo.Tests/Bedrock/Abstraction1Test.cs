@@ -1,11 +1,12 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.Text.Json;
 
-namespace AgentDo.Tests
+namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Abstraction2Test
+	public sealed class Abstraction1Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);
@@ -18,18 +19,24 @@ namespace AgentDo.Tests
 				ConversationRole.User.Says("Its March 2025. I would like to register Manuel Naujoks (born in September 1986) from Karlsruhe.")
 			};
 
-			Person? registeredPerson = default;
-			var tool = Tool.From([System.ComponentModel.Description("Register person.")] (Person person) =>
+			var tool = new Amazon.BedrockRuntime.Model.Tool()
 			{
-				registeredPerson = person;
-				return "registered";
-			});
+				ToolSpec = new ToolSpecification
+				{
+					Name = "RegisterPerson",
+					Description = "Registers a person.",
+					InputSchema = new ToolInputSchema
+					{
+						Json = typeof(Person).ToJsonSchema().ToAmazonJson(),
+					},
+				}
+			};
 
 			var response = await bedrock.ConverseAsync(new ConverseRequest
 			{
 				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
 				Messages = messages,
-				ToolConfig = new ToolConfiguration { Tools = [BedrockAgent.GetToolDefinition(tool)] },
+				ToolConfig = new ToolConfiguration { Tools = [tool] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 
@@ -39,16 +46,13 @@ namespace AgentDo.Tests
 			var text = responseMessage.Content[0].Text;
 			Console.WriteLine(text);
 
-			var toolUse = responseMessage.Content[1].ToolUse;
-			var toolResult = await BedrockAgent.Use([tool], toolUse, ConversationRole.Assistant, null);
-
-			Console.WriteLine(JsonSerializer.Serialize(registeredPerson));
-			Assert.IsNotNull(registeredPerson);
-			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
-			Assert.AreEqual(38, registeredPerson.Age);
-			Assert.IsNotNull(registeredPerson.Address);
-			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
-			Assert.IsNull(registeredPerson.Address!.Street);
+			var person = responseMessage.Content[1].ToolUse.Input.FromAmazonJson<Person>()!;
+			Console.WriteLine(JsonSerializer.Serialize(person));
+			Assert.AreEqual("Manuel Naujoks", person.Name);
+			Assert.AreEqual(38, person.Age);
+			Assert.IsNotNull(person.Address);
+			Assert.AreEqual("Karlsruhe", person.Address!.City);
+			Assert.IsNull(person.Address!.Street);
 		}
 	}
 }

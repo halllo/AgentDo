@@ -7,7 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json.Nodes;
 
-namespace AgentDo
+namespace AgentDo.Bedrock
 {
 	public class BedrockAgent : IAgent
 	{
@@ -104,7 +104,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
 			{
 				Type = p.ParameterType,
-				Description = p.GetCustomAttribute<DescriptionAttribute>()?.Description,
+				p.GetCustomAttribute<DescriptionAttribute>()?.Description,
 				Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
 			});
 
@@ -116,14 +116,14 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					Description = methodDescription,
 					InputSchema = new ToolInputSchema
 					{
-						Json = JsonSchemaExtensions.ToAmazonJson(new JsonObject
+						Json = new JsonObject
 						{
 							["type"] = "object",
 							["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
 								key: p.Key,
 								value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
 							["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
-						}),
+						}.ToAmazonJson(),
 					},
 				}
 			};

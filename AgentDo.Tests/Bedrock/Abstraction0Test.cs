@@ -1,7 +1,7 @@
 ﻿using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 
-namespace AgentDo.Tests
+namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
 	public sealed class Abstraction0Test

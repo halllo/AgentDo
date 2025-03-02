@@ -1,10 +1,11 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
-namespace AgentDo.Tests
+namespace AgentDo.Tests.Bedrock
 {
 	/// <summary>
 	/// Scenarios taken from https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use-inference-call.html
@@ -13,7 +14,7 @@ namespace AgentDo.Tests
 	public sealed class BedrockAgentToolSerializationTest
 	{
 		record GetRadioSongTool(
-			[property: System.ComponentModel.Description("The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ and WKRP.")]
+			[property: Description("The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ and WKRP.")]
 			string Sign);
 
 		[TestMethod]
@@ -42,7 +43,7 @@ namespace AgentDo.Tests
 
 
 		record RateSongTool(
-			[property: System.ComponentModel.Description("The song name")] string Song,
+			[property: Description("The song name")] string Song,
 			int Rating
 			);
 
@@ -88,7 +89,7 @@ namespace AgentDo.Tests
 			};
 
 			var usableTool = Tool.From([Description("Rate a song")] (
-				[System.ComponentModel.Description("The song name")] string song,
+				[Description("The song name")] string song,
 				int rating
 			) => "Rated!");
 

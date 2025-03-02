@@ -1,24 +1,26 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
-namespace AgentDo.Tests
+namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
 	public sealed class Abstraction3Test
 	{
 		record Person(
-			[property: System.ComponentModel.Description("The full name  of the person.")] 
+			[property: Description("The full name  of the person.")] 
 			string Name,	
 			
-			[property: System.ComponentModel.Description("""
+			[property: Description("""
 			The age of the person at the current day.
 			If it needs calculation, pay close attention if the birthday of the current year has already occured or not.
 			""")]
 			int Age,
 			
-			[property: System.ComponentModel.Description("Where the person lives.")] 
+			[property: Description("Where the person lives.")] 
 			Address? Address = null);
 
 		record Address(string City, string? Street = null);
@@ -40,13 +42,13 @@ namespace AgentDo.Tests
 				task: "I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.",
 				tools:
 				[
-					Tool.From([System.ComponentModel.Description("Register person.")] (Person person) =>
+					Tool.From([Description("Register person.")] (Person person) =>
 					{
 						registeredPerson = person;
 						return "registered";
 					}),
 
-					Tool.From([System.ComponentModel.Description("Get today.")]() => $"{DateTime.Today:dd MMMM yyyy}"),
+					Tool.From([Description("Get today.")]() => "01 March 2025"),
 				]);
 
 			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));

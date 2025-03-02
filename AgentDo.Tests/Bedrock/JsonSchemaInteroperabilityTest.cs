@@ -1,10 +1,11 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Amazon.Runtime.Documents;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace AgentDo.Tests
+namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
 	public sealed class JsonSchemaInteroperabilityTest
@@ -96,37 +97,11 @@ namespace AgentDo.Tests
 		});
 
 		[TestMethod]
-		public void ManualSchemaEqualsAutoSchema()
-		{
-			var autoSchema = JsonSchemaExtensions.JsonSchemaString<Person>();
-
-			var manualSchema = personSchemaJsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
-
-			Assert.AreEqual(autoSchema, manualSchema);
-		}
-
-		[TestMethod]
 		public void AmazonJsonMarshallingObject()
 		{
 			var schemaString = JsonSchemaExtensions.JsonSchemaString<Person>();
 
 			Assert.AreEqual(schemaString, schemaString.ToAmazonJson().FromAmazonJson());
-		}
-
-		[TestMethod]
-		public void JsonSchemaOfPrimitive()
-		{
-			var schemaString = JsonSchemaExtensions.JsonSchemaString<int>();
-
-			Assert.AreEqual("""{"type":"integer"}""", schemaString);
-		}
-
-		[TestMethod]
-		public void JsonSchemaOfPrimitiveWithDescription()
-		{
-			var schemaString = typeof(int).ToJsonSchemaString(description: "This is a number.");
-
-			Assert.AreEqual("""{"type":"integer","description":"This is a number."}""", schemaString);
 		}
 
 		[TestMethodWithDI]

@@ -28,11 +28,13 @@ public async Task StartAgent([FromKeyedServices("bedrock")] IAgent agent)
 		task: "Get the most popular song played on a radio station RGBG and rate it as bad.",
 		tools:
 		[
-			Tool.From([Description("Get radio song")]([Description("The call sign for the radio station for which you want the most popular song."), Required] string sign)
-			=> new { songName = "Random Song 1" }),
+			Tool.From([Description("Get radio song")]
+				([Description("The call sign for the radio station for which you want the most popular song."), Required] string sign)
+				=> new { songName = "Random Song 1" }),
 
-			Tool.From([Description("Rate a song")](string song, string rating)
-			=> "Rated!"),
+			Tool.From([Description("Rate a song")]
+				(string song, string rating)
+				=> "Rated!"),
 		]);
 }
 ```

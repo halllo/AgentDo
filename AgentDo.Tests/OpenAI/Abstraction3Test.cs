@@ -1,11 +1,11 @@
-﻿using AgentDo.Bedrock;
-using Amazon.BedrockRuntime;
+﻿using AgentDo.OpenAI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenAI.Chat;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
-namespace AgentDo.Tests.Bedrock
+namespace AgentDo.Tests.OpenAI
 {
 	[TestClass]
 	public sealed class Abstraction3Test
@@ -26,15 +26,14 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockAgentMultiToolUse (IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		public async Task OpenAIAgentMultiToolUse(ChatClient client, ILoggerFactory loggerFactory)
 		{
-			var agent = new BedrockAgent(
-				bedrock: bedrock,
-				logger: loggerFactory.CreateLogger<BedrockAgent>(),
-				options: Options.Create(new BedrockAgentOptions
+			var agent = new OpenAIAgent(
+				client: client,
+				logger: loggerFactory.CreateLogger<OpenAIAgent>(),
+				options: Options.Create(new OpenAIAgentOptions
 				{
-					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
-					Temperature = 0.0F
+					Temperature = 0.0F,
 				}));
 
 			Person? registeredPerson = default;

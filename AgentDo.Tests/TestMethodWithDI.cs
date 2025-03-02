@@ -1,6 +1,7 @@
 ﻿using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenAI.Chat;
 
 namespace AgentDo.Tests
 {
@@ -26,6 +27,9 @@ namespace AgentDo.Tests
 				awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
 				awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
 				region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!)));
+
+			services.AddSingleton(sp => new ChatClient(model: "gpt-4o", apiKey: config["OPENAI_API_KEY"]!));
+
 			serviceProvider = services.BuildServiceProvider();
 		}
 

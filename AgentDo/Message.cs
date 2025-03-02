@@ -4,10 +4,10 @@
 	{
 		public string Role { get; }
 		public string Text { get; }
-		public ToolCall[] ToolCalls { get; }
-		public ToolResult[] ToolResults { get; }
+		public ToolCall[]? ToolCalls { get; }
+		public ToolResult[]? ToolResults { get; }
 
-		internal Message(string role, string text, ToolCall[] toolCalls, ToolResult[] toolResults)
+		internal Message(string role, string text, ToolCall[]? toolCalls, ToolResult[]? toolResults)
 		{
 			Role = role;
 			Text = text;

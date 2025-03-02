@@ -13,7 +13,7 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockConverseWithReflectedToolAndReflectedResponse(IAmazonBedrockRuntime bedrock)
+		public async Task BedrockConverseWithToolInvocation(IAmazonBedrockRuntime bedrock)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
@@ -31,7 +31,7 @@ namespace AgentDo.Tests.Bedrock
 			{
 				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
 				Messages = messages,
-				ToolConfig = new ToolConfiguration { Tools = [BedrockAgent.GetToolDefinition(tool)] },
+				ToolConfig = new ToolConfiguration { Tools = [tool.AsBedrockTool()] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 
@@ -42,7 +42,7 @@ namespace AgentDo.Tests.Bedrock
 			Console.WriteLine(text);
 
 			var toolUse = responseMessage.Content[1].ToolUse;
-			var toolResult = await BedrockAgent.Use([tool], toolUse, ConversationRole.Assistant, null);
+			var toolResult = await tool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
 
 			Console.WriteLine(JsonSerializer.Serialize(registeredPerson));
 			Assert.IsNotNull(registeredPerson);

@@ -38,7 +38,7 @@ namespace AgentDo.Tests.Bedrock
 				}
 			};
 
-			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(Tool.From(getSongTool)));
+			AssertEqual(expectedTool, Tool.From(getSongTool).AsBedrockTool());
 		}
 
 
@@ -69,7 +69,7 @@ namespace AgentDo.Tests.Bedrock
 				}
 			};
 
-			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(Tool.From(rateSongTool)));
+			AssertEqual(expectedTool, Tool.From(rateSongTool).AsBedrockTool());
 		}
 
 		[TestMethod]
@@ -93,7 +93,7 @@ namespace AgentDo.Tests.Bedrock
 				int rating
 			) => "Rated!");
 
-			AssertEqual(expectedTool, BedrockAgent.GetToolDefinition(usableTool));
+			AssertEqual(expectedTool, usableTool.AsBedrockTool());
 		}
 
 
@@ -123,7 +123,7 @@ namespace AgentDo.Tests.Bedrock
 				toolCall = new RateSongToolWithNestedObjects(song, rating);
 				return "Rated!";
 			});
-			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
+			var bedrockTool = usableTool.AsBedrockTool();
 			AssertEqual(expectedTool, bedrockTool);
 
 			//Actually processing it as json
@@ -136,13 +136,12 @@ namespace AgentDo.Tests.Bedrock
 			Assert.AreEqual(1, songRating.Rating);
 
 			//Actually processing it though the bedrock agent tool
-			var toolResult = await BedrockAgent.Use([usableTool], toolUse, ConversationRole.Assistant, null);
+			var toolResult = await usableTool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
 			Assert.AreEqual("Taylor Swift", toolCall!.Song.Artist.Name);
 			Assert.AreEqual("abc", toolCall!.Song.Artist.Pseudonym);
 			Assert.AreEqual("All Too Well", toolCall!.Song.Name);
 			Assert.AreEqual(1, toolCall!.Rating);
 		}
-
 
 		private static void AssertEqual(Amazon.BedrockRuntime.Model.Tool expected, Amazon.BedrockRuntime.Model.Tool actual)
 		{
@@ -164,7 +163,7 @@ namespace AgentDo.Tests.Bedrock
 				toolCall = new RecognizedAlbum(album, price, clerk, inStock, purchaseCounter);
 				return "";
 			});
-			var bedrockTool = BedrockAgent.GetToolDefinition(usableTool);
+			var bedrockTool = usableTool.AsBedrockTool();
 
 			//Actually processing it as json
 			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift. It was already bought three times.", bedrockTool);
@@ -176,7 +175,7 @@ namespace AgentDo.Tests.Bedrock
 			Assert.IsNull(recognized.Album.CustomAlias);
 
 			//Actually processing it though the bedrock agent tool
-			var toolResult = await BedrockAgent.Use([usableTool], toolUse, ConversationRole.Assistant, null);
+			var toolResult = await usableTool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
 			Assert.AreEqual("Taylor Swift", toolCall!.Album.Artist.Name);
 			Assert.AreEqual("RED", toolCall!.Album.Name);
 			Assert.IsNull(toolCall!.Album.CustomAlias);

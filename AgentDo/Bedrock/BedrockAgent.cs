@@ -2,14 +2,11 @@
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
-using System.Reflection;
 using System.Text.Json.Nodes;
 
 namespace AgentDo.Bedrock
 {
-	public class BedrockAgent : IAgent
+	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool, ToolUseBlock, ToolResultBlock>, IAgent
 	{
 		//taken from https://docs.anthropic.com/en/docs/build-with-claude/tool-use#chain-of-thought-tool-use
 		static string chainOfThoughPrompt = @"Answer the user's request using relevant tools (if they are available). 
@@ -34,12 +31,22 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(string task, List<Tool> tools, bool logTask = false)
+		public async Task<List<Message>> Do(string task, List<Tool> tools)
 		{
 			var taskMessage = ConversationRole.User.Says(chainOfThoughPrompt + task);
 			var messages = new List<Amazon.BedrockRuntime.Model.Message> { taskMessage };
 
-			if (logTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+
+			var toolConfig = new ToolConfiguration()
+			{
+				Tools = [.. tools.Select(GetToolDefinition)]
+			};
+
+			var inferenceConfig = new InferenceConfiguration()
+			{
+				Temperature = options.Value.Temperature ?? 0.0F
+			};
 
 			bool keepConversing = true;
 			while (keepConversing)
@@ -48,8 +55,8 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				{
 					ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
 					Messages = messages,
-					ToolConfig = GetConfig(tools),
-					InferenceConfig = new InferenceConfiguration() { Temperature = options.Value.Temperature ?? 0.0F }
+					ToolConfig = toolConfig,
+					InferenceConfig = inferenceConfig,
 				});
 
 				var responseMessage = response.Output.Message;
@@ -84,106 +91,41 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					return new Message(
 						role: m.Role.Value,
 						text: m.Text(),
-						toolCalls: m.ToolsUse().Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson())).ToArray(),
-						toolResults: m.ToolsResult().Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson())).ToArray()
+						toolCalls: [.. m.ToolsUse().Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson()))],
+						toolResults: [.. m.ToolsResult().Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson()))]
 					);
 				})
 				.ToList();
 		}
 
-		private static ToolConfiguration GetConfig(IEnumerable<Tool> tools) => new ToolConfiguration
+		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonObject schema)
 		{
-			Tools = tools.Select(GetToolDefinition).ToList()
-		};
-
-		public static Amazon.BedrockRuntime.Model.Tool GetToolDefinition(Tool tool)
-		{
-			var method = tool.Delegate.GetMethodInfo();
-			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
-			var methodParameters = method.GetParameters();
-			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
-			{
-				Type = p.ParameterType,
-				p.GetCustomAttribute<DescriptionAttribute>()?.Description,
-				Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
-			});
-
 			return new Amazon.BedrockRuntime.Model.Tool
 			{
 				ToolSpec = new ToolSpecification
 				{
-					Name = tool.Name,
-					Description = methodDescription,
+					Name = name,
+					Description = description,
 					InputSchema = new ToolInputSchema
 					{
-						Json = new JsonObject
-						{
-							["type"] = "object",
-							["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
-								key: p.Key,
-								value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
-							["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
-						}.ToAmazonJson(),
+						Json = schema.ToAmazonJson(),
 					},
 				}
 			};
-
-			///copilot generated, not sure if it's correct
-			static bool IsNullable(ParameterInfo parameter)
-			{
-				if (parameter.ParameterType.IsValueType)
-				{
-					return Nullable.GetUnderlyingType(parameter.ParameterType) != null;
-				}
-
-				var nullableAttribute = parameter.GetCustomAttributes()
-					.FirstOrDefault(attr => attr.GetType().FullName == "System.Runtime.CompilerServices.NullableAttribute");
-
-				if (nullableAttribute != null)
-				{
-					var field = nullableAttribute.GetType().GetField("NullableFlags");
-					if (field != null)
-					{
-						var flags = (byte[])field.GetValue(nullableAttribute);
-						return flags[0] == 2;
-					}
-				}
-
-				return false;
-			}
 		}
 
-		public static async Task<ToolResultBlock> Use(IEnumerable<Tool> tools, ToolUseBlock toolUse, ConversationRole role, ILogger? logger)
+		protected override (string name, string id) GetToolName(ToolUseBlock toolUse)
 		{
-			var toolToUse = tools.Single(tool => tool.Name == toolUse.Name);
-			return await Use(toolToUse, toolUse, role, logger);
+			return (toolUse.Name, toolUse.ToolUseId);
 		}
 
-		private static async Task<ToolResultBlock> Use(Tool tool, ToolUseBlock toolUse, ConversationRole role, ILogger? logger)
+		protected override JsonObject GetToolInputs(ToolUseBlock toolUse)
 		{
-			var inputs = toolUse.Input.FromAmazonJson<JsonObject>()!;
+			return toolUse.Input.FromAmazonJson<JsonObject>()!;
+		}
 
-			var method = tool.Delegate.GetMethodInfo();
-			var parameters = method.GetParameters()
-				.Select(p => inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType) : default)
-				.ToArray();
-
-			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, toolUse.Name, parameters);
-
-			var returnValue = tool.Delegate.DynamicInvoke(parameters);
-			object? result;
-			if (returnValue is Task task)
-			{
-				await task;
-				result = task.GetType().GetProperty("Result").GetValue(task);
-			}
-			else
-			{
-				result = returnValue;
-			}
-
-			logger?.LogInformation("{Tool}: {@Result}", toolUse.ToolUseId, result);
-
+		protected override ToolResultBlock GetAsToolResult(ToolUseBlock toolUse, object result)
+		{
 			return new ToolResultBlock
 			{
 				ToolUseId = toolUse.ToolUseId,

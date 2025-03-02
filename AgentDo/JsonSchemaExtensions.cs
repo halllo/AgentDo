@@ -95,5 +95,18 @@ namespace AgentDo
 				return null;
 			}
 		}
+
+		public static T? As<T>(this JsonDocument? json)
+		{
+			if (json != null)
+			{
+				var t = json.Deserialize<T>(DeserializationOptions);
+				return t;
+			}
+			else
+			{
+				return default;
+			}
+		}
 	}
 }

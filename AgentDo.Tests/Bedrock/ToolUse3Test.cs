@@ -8,10 +8,10 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Abstraction3Test
+	public sealed class ToolUse3Test
 	{
 		record Person(
-			[property: Description("The full name  of the person.")]
+			[property: Description("The full name of the person.")]
 			string Name,
 
 			[property: Description("""

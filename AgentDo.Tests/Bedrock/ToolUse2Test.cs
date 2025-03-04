@@ -2,41 +2,36 @@
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.Text.Json;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Abstraction1Test
+	public sealed class ToolUse2Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockConverseWithReflectedToolAndReflectedResponse(IAmazonBedrockRuntime bedrock)
+		public async Task BedrockConverseWithToolInvocation(IAmazonBedrockRuntime bedrock)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
 				ConversationRole.User.Says("Its March 2025. I would like to register Manuel Naujoks (born in September 1986) from Karlsruhe.")
 			};
 
-			var tool = new Amazon.BedrockRuntime.Model.Tool()
+			Person? registeredPerson = default;
+			var tool = Tool.From([Description("Register person.")] (Person person) =>
 			{
-				ToolSpec = new ToolSpecification
-				{
-					Name = "RegisterPerson",
-					Description = "Registers a person.",
-					InputSchema = new ToolInputSchema
-					{
-						Json = typeof(Person).ToJsonSchema().ToAmazonJson(),
-					},
-				}
-			};
+				registeredPerson = person;
+				return "registered";
+			});
 
 			var response = await bedrock.ConverseAsync(new ConverseRequest
 			{
 				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
 				Messages = messages,
-				ToolConfig = new ToolConfiguration { Tools = [tool] },
+				ToolConfig = new ToolConfiguration { Tools = [tool.AsBedrockTool()] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 
@@ -46,13 +41,16 @@ namespace AgentDo.Tests.Bedrock
 			var text = responseMessage.Content[0].Text;
 			Console.WriteLine(text);
 
-			var person = responseMessage.Content[1].ToolUse.Input.FromAmazonJson<Person>()!;
-			Console.WriteLine(JsonSerializer.Serialize(person));
-			Assert.AreEqual("Manuel Naujoks", person.Name);
-			Assert.AreEqual(38, person.Age);
-			Assert.IsNotNull(person.Address);
-			Assert.AreEqual("Karlsruhe", person.Address!.City);
-			Assert.IsNull(person.Address!.Street);
+			var toolUse = responseMessage.Content[1].ToolUse;
+			var toolResult = await tool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
+
+			Console.WriteLine(JsonSerializer.Serialize(registeredPerson));
+			Assert.IsNotNull(registeredPerson);
+			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
+			Assert.AreEqual(38, registeredPerson.Age);
+			Assert.IsNotNull(registeredPerson.Address);
+			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
+			Assert.IsNull(registeredPerson.Address!.Street);
 		}
 	}
 }

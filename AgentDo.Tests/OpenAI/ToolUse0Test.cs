@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace AgentDo.Tests.OpenAI
 {
 	[TestClass]
-	public sealed class Abstraction0Test
+	public sealed class ToolUse0Test
 	{
 		[TestMethodWithDI]
 		public async Task OpenAICompletionWithManualJsonSchemaAndManualResponseParsing(ChatClient client)

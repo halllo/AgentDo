@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace AgentDo.Tests.OpenAI
 {
 	[TestClass]
-	public sealed class Abstraction1Test
+	public sealed class ToolUse1Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);

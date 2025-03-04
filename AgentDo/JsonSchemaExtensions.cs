@@ -14,6 +14,18 @@ namespace AgentDo
 			TreatNullObliviousAsNonNullable = true,
 			TransformSchemaNode = (context, schema) =>
 			{
+				// Render converter properties as strings.
+				var renderAsString = context.PropertyInfo?.PropertyType.GetCustomAttribute<ConvertFromStringAttribute>(inherit: true) != null;
+				if (renderAsString)
+				{
+					var nullableStringSchema = new JsonObject
+					{
+						["type"] = new JsonArray("string", "null"),
+						["default"] = null,
+					};
+					schema = context.PropertyInfo!.IsSetNullable ? nullableStringSchema : typeof(string).ToJsonSchema();
+				}
+
 				// Determine if a type or property and extract the relevant attribute provider
 				ICustomAttributeProvider? attributeProvider = context.PropertyInfo is not null
 					? context.PropertyInfo.AttributeProvider
@@ -107,6 +119,16 @@ namespace AgentDo
 			{
 				return default;
 			}
+		}
+	}
+
+	public class ConvertFromStringAttribute : Attribute
+	{
+		public Type Converter { get; }
+
+		public ConvertFromStringAttribute(Type converter)
+		{
+			this.Converter = converter;
 		}
 	}
 }

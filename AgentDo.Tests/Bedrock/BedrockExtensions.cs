@@ -15,5 +15,23 @@ namespace AgentDo.Tests.Bedrock
 		{
 			return await new BedrockAgent(null!, null!, null!).Use(tool, toolUse, role, null);
 		}
+
+		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = "anthropic.claude-3-sonnet-20240229-v1:0")
+		{
+			var messages = new List<Amazon.BedrockRuntime.Model.Message>
+			{
+				ConversationRole.User.Says(prompt)
+			};
+
+			var response = await bedrock.ConverseAsync(new ConverseRequest
+			{
+				ModelId = modelId,
+				Messages = messages,
+				ToolConfig = new ToolConfiguration { Tools = [tool] },
+				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
+			});
+
+			return response;
+		}
 	}
 }

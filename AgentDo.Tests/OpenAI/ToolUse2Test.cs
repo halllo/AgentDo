@@ -5,7 +5,7 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 namespace AgentDo.Tests.OpenAI
 {
 	[TestClass]
-	public sealed class Abstraction2Test
+	public sealed class ToolUse2Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);

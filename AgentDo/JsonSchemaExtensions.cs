@@ -95,11 +95,34 @@ namespace AgentDo
 			return schema;
 		}
 
-		public static object? As(this JsonNode? json, Type type)
+		internal static object? As(this JsonNode? json, Type type, AutoDiscoverConverters? autoDiscoverConverters = null)
+		{
+			var deserializationOptions = autoDiscoverConverters != null
+				? DeserializationOptions.WithAutoDiscoveredConverters(type, autoDiscoverConverters)
+				: DeserializationOptions;
+
+			return As(json, type, deserializationOptions);
+		}
+
+		internal static JsonSerializerOptions WithAutoDiscoveredConverters(this JsonSerializerOptions options, Type type, AutoDiscoverConverters? autoDiscoverConverters = null)
+		{
+			autoDiscoverConverters ??= new AutoDiscoverConverters();
+			autoDiscoverConverters.CollectRecursivelyFrom(type);
+
+			var newOptions = new JsonSerializerOptions(options);
+			foreach (var converter in autoDiscoverConverters.GetConverters())
+			{
+				newOptions.Converters.Add(converter);
+			}
+
+			return newOptions;
+		}
+
+		public static object? As(this JsonNode? json, Type type, JsonSerializerOptions options)
 		{
 			if (json != null)
 			{
-				var t = json.Deserialize(type, DeserializationOptions);
+				var t = json.Deserialize(type, options);
 				return t;
 			}
 			else
@@ -119,16 +142,6 @@ namespace AgentDo
 			{
 				return default;
 			}
-		}
-	}
-
-	public class ConvertFromStringAttribute : Attribute
-	{
-		public Type Converter { get; }
-
-		public ConvertFromStringAttribute(Type converter)
-		{
-			this.Converter = converter;
 		}
 	}
 }

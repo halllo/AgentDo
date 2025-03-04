@@ -9,7 +9,7 @@ namespace AgentDo.Bedrock
 	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool, ToolUseBlock, ToolResultBlock>, IAgent
 	{
 		//taken from https://docs.anthropic.com/en/docs/build-with-claude/tool-use#chain-of-thought-tool-use
-		static string chainOfThoughPrompt = @"Answer the user's request using relevant tools (if they are available). 
+		public readonly static string ClaudeChainOfThoughPrompt = @"Answer the user's request using relevant tools (if they are available). 
 Before calling a tool, do some analysis within <thinking></thinking> tags. 
 First, think about which of the provided tools is the relevant tool to answer the user's request. 
 Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. 
@@ -31,9 +31,9 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(string task, List<Tool> tools)
+		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
 		{
-			var taskMessage = ConversationRole.User.Says(chainOfThoughPrompt + task);
+			var taskMessage = ConversationRole.User.Says(ClaudeChainOfThoughPrompt + task.Text, task.Images.Select(i => i.ForBedrock()));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message> { taskMessage };
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());

@@ -22,5 +22,24 @@ namespace AgentDo.Bedrock
 			var toolResults = message.Content.Select(c => c.ToolResult).Where(t => t != null);
 			return toolResults;
 		}
+
+		public static ImageBlock ForBedrock(this Image image)
+		{
+			var extension = image.FileInfo.Extension;
+			return new ImageBlock
+			{
+				Format = extension switch
+				{
+					".png" => ImageFormat.Png,
+					".jpg" => ImageFormat.Jpeg,
+					".jpeg" => ImageFormat.Jpeg,
+					_ => throw new ArgumentOutOfRangeException(extension)
+				},
+				Source = new ImageSource
+				{
+					Bytes = image.Stream,
+				},
+			};
+		}
 	}
 }

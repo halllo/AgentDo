@@ -1,6 +1,8 @@
 ﻿using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AgentDo.Tests.Bedrock
 {
@@ -32,6 +34,18 @@ namespace AgentDo.Tests.Bedrock
 			});
 
 			return response;
+		}
+
+		public static IAgent AsAgent(this IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			return new BedrockAgent(
+				bedrock: bedrock,
+				logger: loggerFactory.CreateLogger<BedrockAgent>(),
+				options: Options.Create(new BedrockAgentOptions
+				{
+					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+					Temperature = 0.0F
+				}));
 		}
 	}
 }

@@ -19,8 +19,10 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(string task, List<Tool> tools)
+		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
 		{
+			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
+
 			var messages = new List<ChatMessage>();
 			var resultMessages = new List<Message>();
 
@@ -31,7 +33,7 @@ namespace AgentDo.OpenAI
 				resultMessages.Add(new(ChatMessageRole.System.ToString(), systemMessage.Text(), null, null));
 			}
 
-			var taskMessage = new UserChatMessage(task);
+			var taskMessage = new UserChatMessage(task.Text);
 			messages.Add(taskMessage);
 			resultMessages.Add(new(ChatMessageRole.User.ToString(), taskMessage.Text(), null, null));
 

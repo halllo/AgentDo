@@ -67,10 +67,12 @@ namespace AgentDo
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
 
+			var autoDiscoverConverters = new AutoDiscoverConverters();
+
 			var method = tool.Delegate.GetMethodInfo();
 			var parameters = method.GetParameters()
-				.Select(p => inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType) : default)
-			.ToArray();
+				.Select(p => inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default)
+				.ToArray();
 
 			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
 

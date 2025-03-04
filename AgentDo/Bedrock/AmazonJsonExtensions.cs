@@ -1,7 +1,6 @@
 ﻿using Amazon.Runtime.Documents;
 using Amazon.Runtime.Documents.Internal.Transform;
 using Amazon.Runtime.Internal.Transform;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -38,51 +37,16 @@ namespace AgentDo.Bedrock
 			}
 		}
 
-		public static T? FromAmazonJson<T>(this Document amazonJson, bool selfConverting = false)
+		public static T? FromAmazonJson<T>(this Document amazonJson, bool autoDiscoverConverters = false)
 		{
 			var json = amazonJson.FromAmazonJson();
 
-			JsonSerializerOptions deserializationOptions;
-			if (selfConverting)
-			{
-				deserializationOptions = new JsonSerializerOptions(JsonSchemaExtensions.DeserializationOptions);
-				foreach (var converter in CollectConverters(typeof(T)))
-				{
-					deserializationOptions.Converters.Add((JsonConverter)Activator.CreateInstance(converter.Converter));
-				}
-			}
-			else
-			{
-				deserializationOptions = JsonSchemaExtensions.DeserializationOptions;
-			}
+			var deserializationOptions = autoDiscoverConverters
+				? JsonSchemaExtensions.DeserializationOptions.WithAutoDiscoveredConverters(typeof(T))
+				: JsonSchemaExtensions.DeserializationOptions;
 
 			var t = JsonSerializer.Deserialize<T>(json, deserializationOptions);
 			return t;
-		}
-
-
-		private static IEnumerable<ConvertFromStringAttribute> CollectConverters(Type type)
-		{
-			var converters = new HashSet<ConvertFromStringAttribute>();
-			CollectConverters(type, type, converters);
-			return converters;
-		}
-
-		private static void CollectConverters(Type rootType, Type type, HashSet<ConvertFromStringAttribute> converters)
-		{
-			foreach (var propertyType in type.GetProperties()
-				.Select(p => p.PropertyType.IsArray ? p.PropertyType.GetElementType() : p.PropertyType)
-				.Distinct()
-				.Where(p => type.Assembly == rootType.Assembly))
-			{
-				var selfConverting = propertyType.GetCustomAttribute<ConvertFromStringAttribute>(inherit: true);
-				if (selfConverting != null)
-				{
-					converters.Add(selfConverting);
-				}
-
-				CollectConverters(rootType, propertyType, converters);
-			}
 		}
 	}
 }

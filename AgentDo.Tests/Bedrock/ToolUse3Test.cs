@@ -26,7 +26,7 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockAgentMultiToolUse (IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		public async Task BedrockAgentMultiToolUse(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var agent = new BedrockAgent(
 				bedrock: bedrock,

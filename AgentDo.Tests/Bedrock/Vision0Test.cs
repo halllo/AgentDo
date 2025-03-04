@@ -1,42 +1,17 @@
 ﻿using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
-using PDFtoImage;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
 	public sealed class Vision0Test
 	{
-		[TestMethod]
-		public void PdfToPngs()
-		{
-			var pdf = new FileInfo(@"C:\Users\manue\Downloads\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
-			using var pdfStream = pdf.OpenRead();
-			var pageCount = Conversion.GetPageCount(pdfStream, leaveOpen: true);
-			for (int page = 0; page < pageCount; page++)
-			{
-				var png = new FileInfo(pdf.FullName + $".{page}.png");
-				using var pngStream = png.OpenWrite();
-				Conversion.SavePng(pngStream, pdfStream, new Index(page), leaveOpen: true, options: new RenderOptions { Dpi = 100, });
-			}
-		}
-
 		record CreditCardStatementSchema(DateTime Start, DateTime End, string Number, BookingSchema[] Bookings);
-		record BookingSchema(
-			DateTime BelegDatum,
-			DateTime BuchungsDatum,
-			string Zweck,
-			[property: Description("If the value ends with a plus, treat it as a positive number. If the value ends with a minus, treat it as a negative number.")]
-			string BetragInEuro,
-			string? Waehrung = null,
-			string? Betrag = null,
-			string? Kurs = null,
-			string? WaehrungsumrechnungInEuro = null);
+		record BookingSchema(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, string BetragInEuro, string? Waehrung = null, string? Betrag = null, string? Kurs = null, string? WaehrungsumrechnungInEuro = null);
 
 		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings);
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
@@ -78,7 +53,7 @@ namespace AgentDo.Tests.Bedrock
 				ToolSpec = new ToolSpecification
 				{
 					Name = "CreditCardStatement",
-					Description = "Understands the credit card statement.",
+					Description = "Understand the credit card statement.",
 					InputSchema = new ToolInputSchema
 					{
 						Json = typeof(CreditCardStatementSchema).ToJsonSchema().ToAmazonJson(),
@@ -106,20 +81,19 @@ namespace AgentDo.Tests.Bedrock
 				PropertyNameCaseInsensitive = true,
 				Converters =
 				{
-					new AmountsJsonConverter()
+					new GermanAmounts()
 				}
 			});
 			Console.WriteLine(JsonSerializer.Serialize(creditCardStatement, new JsonSerializerOptions { WriteIndented = true }));
 		}
 
-		class AmountsJsonConverter : JsonConverter<Amount>
+		class GermanAmounts : JsonConverter<Amount>
 		{
 			public override Amount Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 			{
 				if (reader.TokenType == JsonTokenType.String)
 				{
-					string stringValue = reader.GetString()!;
-					return new Amount(decimal.Parse(stringValue, NumberStyles.Any, CultureInfo.InvariantCulture));
+					return new Amount(decimal.Parse(reader.GetString()!, NumberStyles.Any, CultureInfo.GetCultureInfo("de")));
 				}
 				else if (reader.TokenType == JsonTokenType.Number)
 				{
@@ -128,10 +102,7 @@ namespace AgentDo.Tests.Bedrock
 				throw new JsonException();
 			}
 
-			public override void Write(Utf8JsonWriter writer, Amount value, JsonSerializerOptions options)
-			{
-				writer.WriteStringValue(value.Value.ToString(CultureInfo.InvariantCulture));
-			}
+			public override void Write(Utf8JsonWriter writer, Amount value, JsonSerializerOptions options) => throw new NotImplementedException();
 		}
 	}
 }

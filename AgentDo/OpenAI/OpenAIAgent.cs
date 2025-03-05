@@ -49,6 +49,7 @@ namespace AgentDo.OpenAI
 			}
 
 			bool keepConversing = true;
+			Tool.Context context = new();
 			while (keepConversing)
 			{
 				ChatCompletion completion = client.CompleteChat(messages, completionOptions);
@@ -68,7 +69,7 @@ namespace AgentDo.OpenAI
 							{
 								resultMessages.Add(new(completion.Role.ToString(), text, [new Message.ToolCall(toolCall.FunctionName, toolCall.Id, GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions))], null));
 
-								var toolResultMessage = await Use(tools, toolCall, completion.Role, logger);
+								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger);
 								messages.Add(toolResultMessage);
 
 								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content[0].Text)]));
@@ -106,7 +107,7 @@ namespace AgentDo.OpenAI
 			return JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!;
 		}
 
-		protected override ToolChatMessage GetAsToolResult(ChatToolCall toolUse, object result)
+		protected override ToolChatMessage GetAsToolResult(ChatToolCall toolUse, object? result)
 		{
 			return new ToolChatMessage(toolUse.Id, JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions));
 		}

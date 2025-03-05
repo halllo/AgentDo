@@ -4,13 +4,14 @@ using Amazon.BedrockRuntime.Model;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
 	public sealed class Vision1Test
 	{
-		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, Amount NewSaldo);
+		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, [property: Description("Pay attention if its positive or negative.")] Amount NewSaldo);
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 		[ConvertFromString<GermanAmounts>] record Amount(decimal Value);
 

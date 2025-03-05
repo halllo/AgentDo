@@ -49,6 +49,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			};
 
 			bool keepConversing = true;
+			Tool.Context context = new();
 			while (keepConversing)
 			{
 				var response = await bedrock.ConverseAsync(new ConverseRequest
@@ -74,10 +75,19 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					var toolResults = new List<ToolResultBlock>();
 					foreach (var toolUse in toolsUse)
 					{
-						var toolResult = await Use(tools, toolUse, responseMessage.Role, logger);
+						var toolResult = await Use(tools, toolUse, responseMessage.Role, context, logger);
 						toolResults.Add(toolResult);
+
+						if (context.Cancelled)
+						{
+							keepConversing = false;
+							break;
+						}
 					}
-					messages.Add(ConversationRole.User.Says(toolResults));
+					if (!context.Cancelled)
+					{
+						messages.Add(ConversationRole.User.Says(toolResults));
+					}
 				}
 				else
 				{
@@ -124,7 +134,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			return toolUse.Input.FromAmazonJson<JsonObject>()!;
 		}
 
-		protected override ToolResultBlock GetAsToolResult(ToolUseBlock toolUse, object result)
+		protected override ToolResultBlock GetAsToolResult(ToolUseBlock toolUse, object? result)
 		{
 			return new ToolResultBlock
 			{
@@ -133,9 +143,15 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				[
 					new ToolResultContentBlock
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(new
+						Json = Amazon.Runtime.Documents.Document.FromObject(result switch
 						{
-							result
+							null => new { },
+							bool b => new { result = b },
+							int i => new { result = i },
+							long l => new { result = l },
+							double d => new { result = d },
+							string s => new { result = s },
+							_ => result,
 						}),
 					}
 				]

@@ -12,7 +12,7 @@ namespace AgentDo.Tests.OpenAI
 
 		public static async Task<ToolChatMessage> UseAsOpenAITool(this Tool tool, ChatToolCall toolUse, ChatMessageRole role)
 		{
-			return await new OpenAIAgent(null!, null!, null!).Use(tool, toolUse, role, null);
+			return await new OpenAIAgent(null!, null!, null!).Use(tool, toolUse, role, null!, null);
 		}
 	}
 }

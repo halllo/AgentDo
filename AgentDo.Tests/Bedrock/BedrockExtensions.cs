@@ -15,7 +15,7 @@ namespace AgentDo.Tests.Bedrock
 
 		public static async Task<ToolResultBlock> UseAsBedrockTool(this Tool tool, ToolUseBlock toolUse, ConversationRole role)
 		{
-			return await new BedrockAgent(null!, null!, null!).Use(tool, toolUse, role, null);
+			return await new BedrockAgent(null!, null!, null!).Use(tool, toolUse, role, null!, null);
 		}
 
 		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = "anthropic.claude-3-sonnet-20240229-v1:0")

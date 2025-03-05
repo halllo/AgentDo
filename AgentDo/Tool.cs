@@ -36,5 +36,10 @@ namespace AgentDo
 
 			return new Tool(actualToolName, tool);
 		}
+
+		public class Context
+		{
+			public bool Cancelled { get; set; }
+		}
 	}
 }

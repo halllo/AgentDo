@@ -12,7 +12,7 @@ namespace AgentDo
 		{
 			var method = tool.Delegate.GetMethodInfo();
 			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
-			var methodParameters = method.GetParameters();
+			var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
 			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
 			{
 				Type = p.ParameterType,
@@ -56,13 +56,13 @@ namespace AgentDo
 
 		protected abstract TTool CreateTool(string name, string description, JsonObject schema);
 
-		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, ILogger? logger)
+		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger)
 		{
 			var toolToUse = tools.Single(tool => tool.Name == GetToolName(toolUse).name);
-			return await Use(toolToUse, toolUse, role, logger);
+			return await Use(toolToUse, toolUse, role, context, logger);
 		}
 
-		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, ILogger? logger)
+		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger)
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
@@ -71,7 +71,9 @@ namespace AgentDo
 
 			var method = tool.Delegate.GetMethodInfo();
 			var parameters = method.GetParameters()
-				.Select(p => inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default)
+				.Select(p => p.ParameterType == typeof(Tool.Context) ? context : 
+					inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
+				)
 				.ToArray();
 
 			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
@@ -81,7 +83,8 @@ namespace AgentDo
 			if (returnValue is Task task)
 			{
 				await task;
-				result = task.GetType().GetProperty("Result").GetValue(task);
+				var taskResult = task.GetType().GetProperty("Result").GetValue(task);
+				result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
 			}
 			else
 			{
@@ -94,6 +97,6 @@ namespace AgentDo
 
 		protected abstract (string name, string id) GetToolName(TToolUse toolUse);
 		protected abstract JsonObject GetToolInputs(TToolUse toolUse);
-		protected abstract TToolResult GetAsToolResult(TToolUse toolUse, object result);
+		protected abstract TToolResult GetAsToolResult(TToolUse toolUse, object? result);
 	}
 }

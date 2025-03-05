@@ -2,8 +2,8 @@
   "profiles": {
     "AgentDo.Cli": {
       "commandName": "Project",
-      //"commandLineArgs": "task \"Get the most popular song played on a radio station RGBG and rate it as bad.\"",
-      "commandLineArgs": "bedrock-models"
+      "commandLineArgs": "task \"Help me deal the documents (pdfs only) in 'C:\\Users\\manue\\Downloads\\Inbox'\"",
+      //"commandLineArgs": "bedrock-models"
     }
   }
 }

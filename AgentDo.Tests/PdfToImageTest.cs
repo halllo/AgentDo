@@ -8,7 +8,7 @@ namespace AgentDo.Tests
 		[TestMethod, Ignore]
 		public void PdfToPngs()
 		{
-			var pdf = new FileInfo(@"C:\Users\manue\Downloads\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
+			var pdf = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
 			using var pdfStream = pdf.OpenRead();
 			var pageCount = Conversion.GetPageCount(pdfStream, leaveOpen: true);
 			for (int page = 0; page < pageCount; page++)

@@ -48,6 +48,26 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		public async Task SyncList(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			var fCalls = new List<string>();
+
+			var agent = bedrock.AsAgent(loggerFactory);
+			var messages = await agent.Do(
+				task: "Call f with argument 'hello'.",
+				tools:
+				[
+					Tool.From(toolName: "f", tool: (string argument) =>
+					{
+						fCalls.Add($"f({argument})");
+						return new[] { argument }.ToList();
+					}),
+				]);
+
+			CollectionAssert.AreEqual(expected: new[] { "f(hello)" }, actual: fCalls);
+		}
+
+		[TestMethodWithDI]
 		public async Task AyncPrimitive(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();

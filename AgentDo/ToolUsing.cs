@@ -91,7 +91,7 @@ namespace AgentDo
 				result = returnValue;
 			}
 
-			logger?.LogInformation("{Tool}: {@Result}", id, result);
+			logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
 			return GetAsToolResult(toolUse, result);
 		}
 

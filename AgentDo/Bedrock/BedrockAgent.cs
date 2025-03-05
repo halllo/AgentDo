@@ -2,6 +2,7 @@
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Collections;
 using System.Text.Json.Nodes;
 
 namespace AgentDo.Bedrock
@@ -151,6 +152,8 @@ DO NOT ask for more information on optional parameters if it is not provided.
 							long l => new { result = l },
 							double d => new { result = d },
 							string s => new { result = s },
+							Array a => new { result = a },
+							IList c => new { result = c },
 							_ => result,
 						}),
 					}

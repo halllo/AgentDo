@@ -20,7 +20,7 @@ namespace AgentDo.Tests.Bedrock
 		[TestMethodWithDI]
 		public async Task BedrockConverseWithImageAndSchemaAndSeparateDeserialized(IAmazonBedrockRuntime bedrock)
 		{
-			var png = new FileInfo(@"C:\Users\manue\Downloads\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png");
+			var png = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png");
 			using var pngStream = new MemoryStream(File.ReadAllBytes(png.FullName));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{

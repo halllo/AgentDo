@@ -19,7 +19,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var agent = bedrock.AsAgent(loggerFactory);
 
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
 			CreditCardStatement? creditCardStatement = default;
 			var messages = await agent.Do(
 				task: new Prompt("Here is my credit card statement.", image),

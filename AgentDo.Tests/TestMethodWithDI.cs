@@ -1,6 +1,10 @@
-﻿using Amazon.BedrockRuntime;
+﻿using System.ClientModel;
+using System.Reflection;
+using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using OpenAI;
 using OpenAI.Chat;
 
 namespace AgentDo.Tests
@@ -30,6 +34,11 @@ namespace AgentDo.Tests
 
 			services.AddSingleton(sp => new ChatClient(model: "gpt-4o", apiKey: config["OPENAI_API_KEY"]!));
 
+			services.AddKeyedSingleton("hermespro", (sp, _) => new ChatClient(
+				model: "hermes-3-llama-3.2-3b", 
+				credential: new ApiKeyCredential("none"), 
+				options: new OpenAIClientOptions { Endpoint = new Uri("http://127.0.0.1:1234") } ));
+
 			serviceProvider = services.BuildServiceProvider();
 		}
 
@@ -48,7 +57,7 @@ namespace AgentDo.Tests
 				using (var scope = serviceProvider!.CreateScope())
 				{
 					var injectedArgs = testMethod.ParameterTypes!
-						.Select(parameter => scope.ServiceProvider.GetRequiredService(parameter.ParameterType))
+						.Select(p => scope.ServiceProvider.GetRequiredKeyedService(p.ParameterType, p.GetCustomAttribute<FromKeyedServicesAttribute>()?.Key))
 						.ToArray();
 
 					return [testMethod.Invoke(injectedArgs)];

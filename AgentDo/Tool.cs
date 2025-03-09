@@ -21,16 +21,16 @@ namespace AgentDo
 			this.Schema = schema;
 		}
 
-		public static Tool From(Delegate tool, [CallerArgumentExpression("tool")] string toolName = "")
+		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "")
 		{
 			string actualToolName = GetToolName(tool, toolName);
 			return new Tool(actualToolName, tool, null);
 		}
 
-		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
-		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, T> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
-		public static Tool From(JsonDocument schema, Func<JsonDocument, Task> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
-		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, Task<T>> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, T> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From(JsonDocument schema, Func<JsonDocument, Task> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, Task<T>> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
 		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "")
 		{
 			string actualToolName = GetToolName(tool, toolName);

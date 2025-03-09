@@ -131,11 +131,12 @@ namespace AgentDo
 			}
 		}
 
-		public static T? As<T>(this JsonDocument? json)
+		public static T? As<T>(this JsonDocument? json) => As<T>(json, DeserializationOptions);
+		public static T? As<T>(this JsonDocument? json, JsonSerializerOptions options)
 		{
 			if (json != null)
 			{
-				var t = json.Deserialize<T>(DeserializationOptions);
+				var t = json.Deserialize<T>(options);
 				return t;
 			}
 			else

@@ -52,27 +52,23 @@ namespace AgentDo.Cli.Verbs
 								(CreditCardStatement creditCardStatement, Tool.Context context) =>
 								{
 									logger.LogInformation("Classified {file} as Kreditkartenabrechnung with {Saldo}!", path, creditCardStatement.NewSaldo);
+									Json.Out(creditCardStatement);
 									context.Cancelled = true;
-
-									// Do something...
 								}),
 
 								Tool.From([Description("Rechnung")]
 								(Invoice invoice, Tool.Context context) =>
 								{
 									logger.LogInformation("Classified {file} as Rechnung with {Total}!", path, invoice.Total);
+									Json.Out(invoice);
 									context.Cancelled = true;
-
-									// Do something...
 								}),
 
 								Tool.From([Description("Unkown Document")]
 								(Tool.Context context) =>
 								{
-									logger.LogInformation("Could not classify {file}.", path);
+									logger.LogWarning("Could not classify {file}.", path);
 									context.Cancelled = true;
-
-									// Escalate to user for manual processing...
 								}),
 							]);
 
@@ -80,19 +76,85 @@ namespace AgentDo.Cli.Verbs
 					}),
 				]);
 		}
-		
-		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, [property: Description("Pay attention if its positive or negative.")] Amount NewSaldo);
-		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
-		record Invoice(string Number, DateTime Date, Amount Total, string Currency, string Iban, string Bic);
-		[ConvertFromString<GermanAmounts>] record Amount(decimal Value);
 
-		class GermanAmounts : JsonConverter<Amount>
+		record CreditCardStatement(
+			DateTime Start,
+			DateTime End,
+			string Number,
+			Booking[] Bookings,
+			[property: Description("Pay attention if its positive or negative.")]
+			Amount NewSaldo);
+
+		record Booking(
+			DateTime BelegDatum,
+			DateTime BuchungsDatum,
+			string Zweck,
+			Amount BetragInEuro,
+			string? Waehrung = null,
+			Amount? Betrag = null,
+			string? Kurs = null,
+			Amount? WaehrungsumrechnungInEuro = null);
+
+		record Invoice(
+			string Number,
+			DateTime Date,
+			Amount Total,
+			string Currency,
+			string? Iban = null,
+			string? Bic = null);
+
+		[ConvertFromString<GermanOrEnglishAmounts>]
+		public record Amount(decimal Value);
+
+		public class GermanOrEnglishAmounts : JsonConverter<Amount>
 		{
 			public override Amount Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 			{
 				if (reader.TokenType == JsonTokenType.String)
 				{
-					return new Amount(decimal.Parse(reader.GetString()!, NumberStyles.Any, CultureInfo.GetCultureInfo("de")));
+					var numberString = reader.GetString()!;
+					Console.Write("Converting " + numberString);
+
+					// Remove any spaces
+					numberString = numberString.Replace(" ", "");
+
+					// Check if the string contains both comma and period
+					if (numberString.Contains(",") && numberString.Contains("."))
+					{
+						// Determine which is the decimal separator by checking the last occurrence
+						int lastComma = numberString.LastIndexOf(',');
+						int lastPeriod = numberString.LastIndexOf('.');
+
+						if (lastComma > lastPeriod)
+						{
+							// German format: 1.000.000,99
+							numberString = numberString.Replace(".", "").Replace(",", ".");
+						}
+						else
+						{
+							// English format: 1,000,000.99
+							numberString = numberString.Replace(",", "");
+						}
+					}
+					else if (numberString.Contains(","))
+					{
+						// German format: 1.000.000,99 or 1.000,99 or 1,99
+						numberString = numberString.Replace(".", "").Replace(",", ".");
+					}
+					else if (numberString.Contains("."))
+					{
+						// English format: 1,000,000.99 or 1,000.99 or 1.99
+						numberString = numberString.Replace(",", "");
+					}
+
+					if (decimal.TryParse(numberString, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal converted))
+					{
+
+						Console.WriteLine(" into " + converted);
+						return new Amount(converted);
+					}
+
+					throw new FormatException("The input string is not in a recognized format.");
 				}
 				else if (reader.TokenType == JsonTokenType.Number)
 				{

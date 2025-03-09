@@ -1,0 +1,95 @@
+{
+  "prompt": "Classify the document.",
+  "pages": "*",
+  "classes": [
+    {
+      "name": "CreditCardStatement",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "Start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "End": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "Number": {
+            "type": "string"
+          },
+          "Bookings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "BelegDatum": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "BuchungsDatum": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "Zweck": {
+                  "type": "string"
+                },
+                "BetragInEuro": {
+                  "type": "string"
+                },
+                "Waehrung": {
+                  "type": [ "string", "null" ]
+                },
+                "Betrag": {
+                  "type": [ "string", "null" ]
+                },
+                "Kurs": {
+                  "type": [ "string", "null" ]
+                },
+                "WaehrungsumrechnungInEuro": {
+                  "type": [ "string", "null" ]
+                }
+              },
+              "required": [ "BelegDatum", "BuchungsDatum", "Zweck", "BetragInEuro" ]
+            }
+          },
+          "NewSaldo": {
+            "type": "string",
+            "description": "Pay attention if its positive or negative."
+          }
+        },
+        "required": [ "Start", "End", "Number", "Bookings", "NewSaldo" ]
+      }
+    },
+		{
+      "name": "Invoice",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "Number": {
+            "type": "string"
+          },
+          "Date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "Total": {
+            "type": "string"
+          },
+          "Currency": {
+            "type": "string"
+          },
+          "Iban": {
+            "type": "string"
+          },
+          "Bic": {
+            "type": "string"
+          }
+        },
+        "required": [ "Number", "Date", "Total", "Currency" ]
+      }
+		}
+  ]
+}

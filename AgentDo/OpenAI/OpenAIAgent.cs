@@ -88,12 +88,12 @@ namespace AgentDo.OpenAI
 			return resultMessages;
 		}
 
-		protected override ChatTool CreateTool(string name, string description, JsonObject schema)
+		protected override ChatTool CreateTool(string name, string description, JsonDocument schema)
 		{
 			return ChatTool.CreateFunctionTool(
 				functionName: name,
 				functionDescription: description,
-				functionParameters: BinaryData.FromString(schema.ToJsonString(JsonSchemaExtensions.OutputOptions))
+				functionParameters: BinaryData.FromString(schema.RootElement.GetRawText())
 			);
 		}
 

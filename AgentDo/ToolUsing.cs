@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace AgentDo
@@ -12,22 +13,32 @@ namespace AgentDo
 		{
 			var method = tool.Delegate.GetMethodInfo();
 			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
-			var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
-			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
-			{
-				Type = p.ParameterType,
-				p.GetCustomAttribute<DescriptionAttribute>()?.Description,
-				Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
-			});
 
-			return CreateTool(tool.Name, methodDescription, new JsonObject
+			if (tool.Schema != null)
 			{
-				["type"] = "object",
-				["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
-					key: p.Key,
-					value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
-				["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
-			});
+				return CreateTool(tool.Name, methodDescription, tool.Schema);
+			}
+			else
+			{
+				var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
+				var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
+				{
+					Type = p.ParameterType,
+					p.GetCustomAttribute<DescriptionAttribute>()?.Description,
+					Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
+				});
+
+				var schema = new JsonObject
+				{
+					["type"] = "object",
+					["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
+						key: p.Key,
+						value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
+					["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
+				};
+
+				return CreateTool(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
+			}
 
 			///copilot generated, not sure if it's correct
 			static bool IsNullable(ParameterInfo parameter)
@@ -54,7 +65,7 @@ namespace AgentDo
 			}
 		}
 
-		protected abstract TTool CreateTool(string name, string description, JsonObject schema);
+		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
 
 		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger)
 		{
@@ -66,12 +77,14 @@ namespace AgentDo
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
+			var method = tool.Delegate.GetMethodInfo();
 
 			var autoDiscoverConverters = new AutoDiscoverConverters();
-
-			var method = tool.Delegate.GetMethodInfo();
 			var parameters = method.GetParameters()
-				.Select(p => p.ParameterType == typeof(Tool.Context) ? context : 
+				.Select(p =>
+					p.ParameterType == typeof(Tool.Context) ? context :
+					p.ParameterType == typeof(JsonObject) ? inputs :
+					p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
 					inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
 				)
 				.ToArray();

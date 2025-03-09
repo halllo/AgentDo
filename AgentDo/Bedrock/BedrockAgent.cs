@@ -3,6 +3,7 @@ using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace AgentDo.Bedrock
@@ -109,7 +110,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				.ToList();
 		}
 
-		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonObject schema)
+		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonDocument schema)
 		{
 			return new Amazon.BedrockRuntime.Model.Tool
 			{

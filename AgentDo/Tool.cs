@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace AgentDo
@@ -11,13 +12,32 @@ namespace AgentDo
 
 		public Delegate Delegate { get; private set; }
 
-		private Tool(string name, Delegate tool)
+		internal JsonDocument? Schema { get; private set; }
+
+		private Tool(string name, Delegate tool, JsonDocument? schema)
 		{
 			this.Name = name;
 			this.Delegate = tool;
+			this.Schema = schema;
 		}
 
 		public static Tool From(Delegate tool, [CallerArgumentExpression("tool")] string toolName = "")
+		{
+			string actualToolName = GetToolName(tool, toolName);
+			return new Tool(actualToolName, tool, null);
+		}
+
+		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, T> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From(JsonDocument schema, Func<JsonDocument, Task> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, Task<T>> tool, [CallerArgumentExpression("tool")] string toolName = "") => From(schema, (Delegate)tool, toolName);
+		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "")
+		{
+			string actualToolName = GetToolName(tool, toolName);
+			return new Tool(actualToolName, tool, schema);
+		}
+
+		private static string GetToolName(Delegate tool, string toolName)
 		{
 			string actualToolName;
 			if (toolName.Contains(' ') || toolName.Contains('.'))
@@ -34,7 +54,7 @@ namespace AgentDo
 				actualToolName = toolName;
 			}
 
-			return new Tool(actualToolName, tool);
+			return actualToolName;
 		}
 
 		public class Context

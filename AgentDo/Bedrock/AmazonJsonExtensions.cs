@@ -4,7 +4,6 @@ using Amazon.Runtime.Internal.Transform;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using ThirdParty.Json.LitJson;
 
 namespace AgentDo.Bedrock
@@ -12,6 +11,7 @@ namespace AgentDo.Bedrock
 	public static class AmazonJsonExtensions
 	{
 		public static Document ToAmazonJson(this JsonNode json) => json.ToJsonString(JsonSchemaExtensions.OutputOptions).ToAmazonJson();
+		public static Document ToAmazonJson(this JsonDocument json) => json.RootElement.GetRawText().ToAmazonJson();
 		public static Document ToAmazonJson(this string json)
 		{
 			using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));

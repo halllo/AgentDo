@@ -67,45 +67,70 @@ namespace AgentDo
 
 		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
 
-		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger)
+		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false)
 		{
-			var toolToUse = tools.Single(tool => tool.Name == GetToolName(toolUse).name);
-			return await Use(toolToUse, toolUse, role, context, logger);
+			var requestedToolName = GetToolName(toolUse).name;
+			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
+			if (toolToUse == null)
+			{
+				logger?.LogError("{Role}: Tool {ToolName} not found.", role, requestedToolName);
+
+				if (ignoreUnknownTools)
+				{
+					return GetAsToolResult(toolUse, "Unknown tool. Dont call again!");
+				}
+				else
+				{
+					throw new NotSupportedException(requestedToolName);
+				}
+			}
+			else
+			{
+				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema);
+			}
 		}
 
-		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger)
+		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false)
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
 			var method = tool.Delegate.GetMethodInfo();
 
-			var autoDiscoverConverters = new AutoDiscoverConverters();
-			var parameters = method.GetParameters()
-				.Select(p =>
-					p.ParameterType == typeof(Tool.Context) ? context :
-					p.ParameterType == typeof(JsonObject) ? inputs :
-					p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
-					inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
-				)
-				.ToArray();
-
-			logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
-
-			var returnValue = tool.Delegate.DynamicInvoke(parameters);
-			object? result;
-			if (returnValue is Task task)
+			try
 			{
-				await task;
-				var taskResult = task.GetType().GetProperty("Result").GetValue(task);
-				result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
-			}
-			else
-			{
-				result = returnValue;
-			}
+				var autoDiscoverConverters = new AutoDiscoverConverters();
+				var parameters = method.GetParameters()
+					.Select(p =>
+						p.ParameterType == typeof(Tool.Context) ? context :
+						p.ParameterType == typeof(JsonObject) ? inputs :
+						p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
+						inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
+					)
+					.ToArray();
 
-			logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
-			return GetAsToolResult(toolUse, result);
+				logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
+
+				var returnValue = tool.Delegate.DynamicInvoke(parameters);
+				object? result;
+				if (returnValue is Task task)
+				{
+					await task;
+					var taskResult = task.GetType().GetProperty("Result").GetValue(task);
+					result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
+				}
+				else
+				{
+					result = returnValue;
+				}
+
+				logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
+				return GetAsToolResult(toolUse, result);
+			}
+			catch (JsonException invalidSchema) when (ignoreInvalidSchema)
+			{
+				logger?.LogError(invalidSchema, "{Role}: Invoking {ToolUse}(@Input) failed because invalid schema.", role, name, inputs);
+				return GetAsToolResult(toolUse, "failed");
+			}
 		}
 
 		protected abstract (string name, string id) GetToolName(TToolUse toolUse);

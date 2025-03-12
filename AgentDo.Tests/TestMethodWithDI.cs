@@ -1,11 +1,10 @@
-﻿using System.ClientModel;
-using System.Reflection;
+﻿using AgentDo.OpenAI.Like;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using OpenAI;
 using OpenAI.Chat;
+using System.Reflection;
 
 namespace AgentDo.Tests
 {
@@ -27,17 +26,27 @@ namespace AgentDo.Tests
 			var services = new ServiceCollection();
 			services.AddLogging();
 
+			//Bedrock
 			services.AddSingleton<IAmazonBedrockRuntime>(sp => new AmazonBedrockRuntimeClient(
 				awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
 				awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
 				region: Amazon.RegionEndpoint.GetBySystemName(config["AWSBedrockRegion"]!)));
 
-			services.AddSingleton(sp => new ChatClient(model: "gpt-4o", apiKey: config["OPENAI_API_KEY"]!));
+			//OpenAI
+			services.AddSingleton(sp => new ChatClient(
+				model: "gpt-4o",
+				apiKey: config["OPENAI_API_KEY"]!));
 
-			services.AddKeyedSingleton("hermespro", (sp, _) => new ChatClient(
-				model: "hermes-3-llama-3.2-3b", 
-				credential: new ApiKeyCredential("none"), 
-				options: new OpenAIClientOptions { Endpoint = new Uri("http://127.0.0.1:1234") } ));
+			//Local
+			services.AddHttpClient("local", c => c.BaseAddress = new Uri("http://localhost:1234/")).AddAsKeyed();
+			services.Configure<OpenAILikeClient.Options>("local", o =>
+			{
+				//o.Model = "hermes-3-llama-3.2-3b"; //bad singular function call
+				o.Model = "hermes-2-pro-mistral-7b"; //good singular function call, bad multiple function calls, bad agents
+			});
+			services.AddKeyedTransient("local", (sp, key) => new OpenAILikeClient(
+				http: sp.GetRequiredKeyedService<HttpClient>(key),
+				options: Options.Create(sp.GetRequiredService<IOptionsMonitor<OpenAILikeClient.Options>>().Get(key!.ToString()))));
 
 			serviceProvider = services.BuildServiceProvider();
 		}

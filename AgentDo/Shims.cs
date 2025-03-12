@@ -12,3 +12,9 @@
 		public string ParameterName { get; }
 	}
 }
+
+namespace System.Runtime.CompilerServices
+{
+	// Support for netstandard2.0 taken from https://stackoverflow.com/a/64749403/6466378.
+	internal static class IsExternalInit { }
+}

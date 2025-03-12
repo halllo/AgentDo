@@ -52,7 +52,7 @@ namespace AgentDo.OpenAI
 			Tool.Context context = new();
 			while (keepConversing)
 			{
-				ChatCompletion completion = client.CompleteChat(messages, completionOptions);
+				ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions);
 				messages.Add(new AssistantChatMessage(completion));
 
 				var text = completion.Text();

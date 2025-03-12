@@ -29,12 +29,12 @@ namespace AgentDo.OpenAI.Like
 			{
 				var systemMessage = new OpenAILikeClient.Message("system", options.Value.SystemPrompt!);
 				messages.Add(systemMessage);
-				resultMessages.Add(new(systemMessage.Role, systemMessage.Content, null, null));
+				resultMessages.Add(new(systemMessage.Role, systemMessage.Content!, null, null));
 			}
 
 			var taskMessage = new OpenAILikeClient.Message("user", task.Text);
 			messages.Add(taskMessage);
-			resultMessages.Add(new(taskMessage.Role, taskMessage.Content, null, null));
+			resultMessages.Add(new(taskMessage.Role, taskMessage.Content!, null, null));
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Content);
 
@@ -49,7 +49,7 @@ namespace AgentDo.OpenAI.Like
 			while (keepConversing)
 			{
 				var completion = await client.ChatCompletion(messages, toolDefinitions);
-				messages.Add(new(completion.Message.Role, completion.Message.Content ?? string.Empty));
+				messages.Add(completion.Message);
 
 				var text = completion.Message.Content;
 				if (!string.IsNullOrWhiteSpace(text))
@@ -68,7 +68,7 @@ namespace AgentDo.OpenAI.Like
 								var toolResultMessage = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools);
 								messages.Add(toolResultMessage);
 
-								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content)]));
+								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content!)]));
 							}
 							break;
 						}
@@ -101,7 +101,10 @@ namespace AgentDo.OpenAI.Like
 
 		protected override OpenAILikeClient.Message GetAsToolResult(OpenAILikeClient.ToolCall toolUse, object? result)
 		{
-			return new OpenAILikeClient.Message("tool", JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions), toolUse.Id);
+			return new OpenAILikeClient.Message(
+				Role: "tool", 
+				Content: JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions), 
+				ToolCallId: toolUse.Id);
 		}
 	}
 }

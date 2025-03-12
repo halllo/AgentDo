@@ -41,8 +41,9 @@ namespace AgentDo.Tests
 			services.AddHttpClient("local", c => c.BaseAddress = new Uri("http://localhost:1234/")).AddAsKeyed();
 			services.Configure<OpenAILikeClient.Options>("local", o =>
 			{
-				//o.Model = "hermes-3-llama-3.2-3b"; //bad singular function call
-				o.Model = "hermes-2-pro-mistral-7b"; //good singular function call, bad multiple function calls, bad agents
+				o.ParallelToolCalls = false;
+				//o.Model = "hermes-3-llama-3.2-3b";
+				o.Model = "hermes-2-pro-mistral-7b";
 			});
 			services.AddKeyedTransient("local", (sp, key) => new OpenAILikeClient(
 				http: sp.GetRequiredKeyedService<HttpClient>(key),

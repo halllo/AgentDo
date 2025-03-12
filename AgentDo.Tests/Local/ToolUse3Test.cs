@@ -14,7 +14,7 @@ namespace AgentDo.Tests.Local
 			[property: Description("The full name of the person.")]
 			string Name,
 
-			[property: Description("The age of the person at the current day.")]
+			[property: Description("The age of the person at the current day. If it is not directly provided, calculcate it by using the 'calculate_age' tool.")]
 			int Age,
 
 			[property: Description("Where the person lives.")]
@@ -33,12 +33,14 @@ namespace AgentDo.Tests.Local
 					IgnoreInvalidSchema = true,
 					IgnoreUnkownTools = true,
 					SystemPrompt = @"Answer the user's request using relevant tools (if they are available). 
-Before calling a tool, do some analysis within [THINKING] tags.
 First, think about which of the provided tools is the relevant tool to answer the user's request. 
 Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. 
 When deciding if the parameter can be inferred, carefully consider all the context including the return values from other tools to see if it supports optaining a specific value.
-If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call."
+If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call.
+BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead ask the user to provide the missing parameters. 
+DO NOT ask for more information on optional parameters if it is not provided."
 				}));
+//Before calling a tool, do some analysis within <thinking></thinking> tags.
 
 			Person? registeredPerson = default;
 			var messages = await agent.Do(
@@ -51,9 +53,9 @@ If all of the required parameters are present or can be reasonably inferred, clo
 						return "registered";
 					}),
 
-					Tool.From(toolName: "get_today", tool: [Description("Gets the current day, month and year. Call this tool before any date calculations.")]() => "01 March 2025"),
+					Tool.From(toolName: "get_today", tool: [Description("Gets the current day, month and year.")]() => "01 March 2025"),
 
-					Tool.From(toolName: "calculate_age", tool: [Description("Calculate age.")](DateTime birthday, DateTime? today) => ((today ?? DateTime.Today) - birthday).TotalDays / 365),
+					Tool.From(toolName: "calculate_age", tool: [Description("Calculate age.")](DateTime birthday) => (DateTime.Today - birthday).TotalDays / 365),
 				]);
 
 			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));

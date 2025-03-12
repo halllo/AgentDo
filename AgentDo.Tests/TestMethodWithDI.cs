@@ -38,12 +38,17 @@ namespace AgentDo.Tests
 				apiKey: config["OPENAI_API_KEY"]!));
 
 			//Local
-			services.AddHttpClient("local", c => c.BaseAddress = new Uri("http://localhost:1234/")).AddAsKeyed();
+			services.AddHttpClient("local", c =>
+			{
+				c.BaseAddress = new Uri("http://localhost:1234/");
+				c.Timeout = TimeSpan.FromMinutes(5);
+			}).AddAsKeyed();
 			services.Configure<OpenAILikeClient.Options>("local", o =>
 			{
 				o.ParallelToolCalls = false;
 				//o.Model = "hermes-3-llama-3.2-3b";
-				o.Model = "hermes-2-pro-mistral-7b";
+				//o.Model = "hermes-2-pro-mistral-7b";
+				o.Model = "llama-3.3-70b-instruct";
 			});
 			services.AddKeyedTransient("local", (sp, key) => new OpenAILikeClient(
 				http: sp.GetRequiredKeyedService<HttpClient>(key),

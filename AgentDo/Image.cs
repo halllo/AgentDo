@@ -5,16 +5,21 @@
 		public static Image From(FileInfo file)
 		{
 			var stream = new MemoryStream(File.ReadAllBytes(file.FullName));
-			return new Image(stream, file);
+			return new Image(stream, file.Extension.ToLowerInvariant());
+		}
+
+		public static Image From(MemoryStream stream, string filename)
+		{
+			return new Image(stream, Path.GetExtension(Path.GetFileName(filename)).ToLowerInvariant());
 		}
 
 		public MemoryStream Stream { get; }
-		public FileInfo FileInfo { get; }
+		public string FileExtension { get; }
 
-		private Image(MemoryStream stream, FileInfo fileInfo)
+		private Image(MemoryStream stream, string fileExtension)
 		{
 			Stream = stream;
-			FileInfo = fileInfo;
+			FileExtension = fileExtension;
 		}
 
 		public void Dispose()

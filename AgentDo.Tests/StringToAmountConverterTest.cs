@@ -1,10 +1,9 @@
 ﻿using System.Text.Json;
-using static AgentDo.Cli.Verbs.DoTask;
 
 namespace AgentDo.Tests
 {
 	[TestClass]
-	public sealed class DecimalParserTest
+	public sealed class StringToAmountConverterTest
 	{
 		[DataTestMethod]
 		[DataRow("1,99", 1.99)]
@@ -31,7 +30,7 @@ namespace AgentDo.Tests
 			var serialized = JsonSerializer.Serialize(new { Amount = input });
 			var deserialized = JsonSerializer.Deserialize<ObjectWithAmount>(serialized, new JsonSerializerOptions
 			{
-				Converters = { new GermanOrEnglishAmounts() }
+				Converters = { new StringToAmountConverter() }
 			})!;
 			return deserialized.Amount.Value;
 		}

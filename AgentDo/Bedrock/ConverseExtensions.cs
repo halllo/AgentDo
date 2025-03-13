@@ -25,7 +25,7 @@ namespace AgentDo.Bedrock
 
 		public static ImageBlock ForBedrock(this Image image)
 		{
-			var extension = image.FileInfo.Extension.ToLowerInvariant();
+			var extension = image.FileExtension;
 			return new ImageBlock
 			{
 				Format = extension switch

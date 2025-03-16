@@ -23,8 +23,8 @@ namespace AgentDo
 			foreach (var propertyType in type.GetProperties()
 				.Select(p => p.PropertyType.IsArray ? p.PropertyType.GetElementType() : p.PropertyType)
 				.Distinct()
-				.Where(t => t.Assembly == rootType.Assembly)
-				.Where(t => !alreadyLookedAtTypes.Contains(t)))// when whe have already lookat at the type, we don't need to look at it again
+				.Where(t => t.Assembly == rootType.Assembly || t.Assembly == typeof(ConvertFromStringAttribute).Assembly)
+				.Where(t => !alreadyLookedAtTypes.Contains(t)))// when whe have already looked at the type, we don't need to look at it again
 			{
 				var selfConverting = propertyType.GetCustomAttribute<ConvertFromStringAttribute>(inherit: true);
 				if (selfConverting != null)

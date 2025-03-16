@@ -10,6 +10,8 @@ namespace AgentDo.Tests
 		[DataRow("1.99", 1.99)]
 		[DataRow("-1,99", -1.99)]
 		[DataRow("-1.99", -1.99)]
+		[DataRow("2.99+", 2.99)]
+		[DataRow("2.99-", -2.99)]
 		[DataRow("1000,99", 1000.99)]
 		[DataRow("1000.99", 1000.99)]
 		[DataRow("-1000,99", -1000.99)]

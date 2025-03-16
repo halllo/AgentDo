@@ -23,7 +23,7 @@ namespace AgentDo.Tests.Local
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task HermesProAgentMultiToolUse([FromKeyedServices("local")] OpenAILikeClient client, ILoggerFactory loggerFactory)
+		public async Task LocalAgentMultiToolUse([FromKeyedServices("local")] OpenAILikeClient client, ILoggerFactory loggerFactory)
 		{
 			var agent = new OpenAILikeAgent(
 				client: client,

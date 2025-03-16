@@ -11,12 +11,12 @@ namespace AgentDo.Tests.Local
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task HermesProCompletionWithReflectedToolAndReflectedResponse([FromKeyedServices("local")] OpenAILikeClient client)
+		public async Task LocalCompletionWithReflectedToolAndReflectedResponse([FromKeyedServices("local")] OpenAILikeClient client)
 		{
 			OpenAILikeClient.Message[] messages =
 			[
 				new ("system", @"Answer the user's request using relevant tools. Use only the tools provided. If parameters for the tools are missing and cannot be inferred, dont call the tool."),
-				new ("user", "Its March 2025. I would like to register Manuel Naujoks (born in September 1986, 38 years old) from Karlsruhe.")
+				new ("user", "Its March 2025. I would like to register Manuel Naujoks (born in September 1986) from Karlsruhe.")
 			];
 
 			OpenAILikeClient.Tool[] tools =

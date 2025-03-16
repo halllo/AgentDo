@@ -36,7 +36,7 @@ namespace AgentDo.OpenAI.Like
 			messages.Add(taskMessage);
 			resultMessages.Add(new(taskMessage.Role, taskMessage.Content!, null, null));
 
-			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Content);
+			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
 
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
 			foreach (var tool in tools)

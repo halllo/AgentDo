@@ -48,7 +48,8 @@ namespace AgentDo.Tests
 				o.ParallelToolCalls = false;
 				//o.Model = "hermes-3-llama-3.2-3b";
 				//o.Model = "hermes-2-pro-mistral-7b";
-				o.Model = "llama-3.3-70b-instruct";
+				//o.Model = "llama-3.3-70b-instruct";
+				o.Model = "gemma-3-27b-it";
 			});
 			services.AddKeyedTransient("local", (sp, key) => new OpenAILikeClient(
 				http: sp.GetRequiredKeyedService<HttpClient>(key),

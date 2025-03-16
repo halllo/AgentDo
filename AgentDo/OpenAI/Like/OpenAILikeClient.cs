@@ -14,7 +14,8 @@ namespace AgentDo.OpenAI.Like
 			public bool ParallelToolCalls { get; set; }
 		}
 
-		public record Message(string Role, string? Content = null, ToolCall[]? ToolCalls = null, string? ToolCallId = null);
+		public record Message(string Role, string? Content = null, MessageContent[]? ContentArray = null, ToolCall[]? ToolCalls = null, string? ToolCallId = null);
+		public record MessageContent(string Type, string? Text = null, MemoryStream? PngImage = null);
 		public record Tool(string Name, string Description, JsonDocument Schema);
 
 		private record CompletionResponseRaw(CompletionResponse[] Choices);
@@ -41,13 +42,26 @@ namespace AgentDo.OpenAI.Like
 			var content = new
 			{
 				model = options.Value.Model,
-				messages = messages.Select(m => new
-				{
-					role = m.Role,
-					content = m.Content,
-					tool_calls = m.ToolCalls,
-					tool_call_id = m.ToolCallId,
-				}).ToArray(),
+				messages = messages.Select(m => m.ContentArray != null
+					? (object) new
+					{
+						role = m.Role,
+						content = m.ContentArray.Select(c => new
+						{
+							type = c.Type,
+							text = c.Text,
+							image_url = c.PngImage != null ? new { url = GetBase64EncodedUrlOfPng(c.PngImage) } : null,
+						}),
+						tool_calls = m.ToolCalls,
+						tool_call_id = m.ToolCallId,
+					}
+					: (object) new
+					{
+						role = m.Role,
+						content = m.Content,
+						tool_calls = m.ToolCalls,
+						tool_call_id = m.ToolCallId,
+					}).ToArray(),
 				parallel_tool_calls = options.Value.ParallelToolCalls,
 				tools = tools.Select(t => new
 				{
@@ -72,5 +86,7 @@ namespace AgentDo.OpenAI.Like
 			var responseBody = await response.Content.ReadAsStringAsync();
 			return JsonSerializer.Deserialize<CompletionResponseRaw>(responseBody, snakeCaseLower)!.Choices.Single();
 		}
+
+		private static string GetBase64EncodedUrlOfPng(MemoryStream pngStream) => $"data:image/png;base64,{Convert.ToBase64String(pngStream.ToArray())}";
 	}
 }

@@ -19,6 +19,8 @@ namespace AgentDo.Bedrock
 			var unmarshaller = DocumentUnmarshaller.Instance;
 			var unmarshalled = unmarshaller.Unmarshall(context);
 			return unmarshalled;
+
+			//return Document.FromObject(JsonMapper.ToObject(json)); //cannot deserialize "default":null but throws NRE
 		}
 
 		public static string FromAmazonJson(this Document amazonJson)

@@ -26,6 +26,7 @@ namespace AgentDo.Tests.Bedrock
 					Description = "Registers a person.",
 					InputSchema = new ToolInputSchema
 					{
+						/*
 						Json = Amazon.Runtime.Documents.Document.FromObject(new
 						{
 							type = "object",
@@ -66,6 +67,37 @@ namespace AgentDo.Tests.Bedrock
 								"name"
 							},
 						}),
+						*/
+
+						Json = Amazon.Runtime.Documents.Document.FromObject(ThirdParty.Json.LitJson.JsonMapper.ToObject("""
+						{
+							"type": "object",
+							"properties": {
+								"name": {
+									"type": "string",
+									"description": "The name of the person."
+								},
+								"age": {
+									"type": "integer",
+									"description": "The age of the person."
+								},
+								"address": {
+									"type": ["object", "null"],
+									"description": "The address of the person.",
+									"properties": {
+										"street": {
+											"type": "string"
+										},
+										"city": {
+											"type": "string"
+										}
+									},
+									"required": [ "city" ]
+								}
+							},
+							"required": [ "name" ]
+						}
+						""")),
 					},
 				}
 			};

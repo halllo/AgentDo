@@ -7,20 +7,20 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Vision2Test
+	public sealed class VisionDoc2Test
 	{
 		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, [property: Description("Pay attention if its positive or negative.")] Amount NewSaldo);
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockAgentWithImageAndToolInvocation(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		public async Task BedrockAgentWithDocumentAndToolInvocation(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var agent = bedrock.AsAgent(loggerFactory);
 
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			using var document = Document.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF"));
 			CreditCardStatement? creditCardStatement = default;
 			var messages = await agent.Do(
-				task: new Prompt("Here is my credit card statement.", image),
+				task: new Prompt("Here is my credit card statement.", document),
 				tools:
 				[
 					Tool.From(toolName: "CreditCardStatement", tool: [Description("Understand the credit card statement.")]

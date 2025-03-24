@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using AgentDo.Content;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.Text.Json;

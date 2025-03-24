@@ -1,4 +1,5 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Content;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -35,8 +36,13 @@ DO NOT ask for more information on optional parameters if it is not provided.
 
 		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
 		{
-			var taskMessage = ConversationRole.User.Says(ClaudeChainOfThoughPrompt + task.Text, task.Images.Select(i => i.ForBedrock()));
+			var taskMessage = ConversationRole.User.Says(
+				text: ClaudeChainOfThoughPrompt + task.Text,
+				images: task.Images.Select(i => i.ForBedrock()),
+				documents: task.Documents.Select(d => d.ForBedrock()));
+
 			var messages = new List<Amazon.BedrockRuntime.Model.Message> { taskMessage };
+			var resultMessages = new List<Message> { new(taskMessage.Role, taskMessage.Text()) };
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
 
@@ -86,28 +92,26 @@ DO NOT ask for more information on optional parameters if it is not provided.
 							break;
 						}
 					}
+
+					resultMessages.Add(new Message(responseMessage.Role, text,
+						toolCalls: [.. toolsUse.Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson()))],
+						toolResults: null,
+						generationData: new Message.GenerationData(response.Usage.InputTokens, response.Usage.OutputTokens)));
+
 					if (!context.Cancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
+						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson()))]));
 					}
 				}
 				else
 				{
 					keepConversing = false;
+					resultMessages.Add(new Message(responseMessage.Role, text, null, null, new Message.GenerationData(response.Usage.InputTokens, response.Usage.OutputTokens)));
 				}
 			}
 
-			return messages
-				.Select(m =>
-				{
-					return new Message(
-						role: m.Role.Value,
-						text: m.Text(),
-						toolCalls: [.. m.ToolsUse().Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson()))],
-						toolResults: [.. m.ToolsResult().Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson()))]
-					);
-				})
-				.ToList();
+			return resultMessages;
 		}
 
 		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonDocument schema)

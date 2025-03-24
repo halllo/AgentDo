@@ -1,4 +1,4 @@
-﻿namespace AgentDo
+﻿namespace AgentDo.Content
 {
 	public class Image : IDisposable
 	{

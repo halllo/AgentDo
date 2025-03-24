@@ -6,13 +6,15 @@
 		public string Text { get; }
 		public ToolCall[]? ToolCalls { get; }
 		public ToolResult[]? ToolResults { get; }
+		public GenerationData? Generation { get; }
 
-		internal Message(string role, string text, ToolCall[]? toolCalls, ToolResult[]? toolResults)
+		internal Message(string role, string text, ToolCall[]? toolCalls = null, ToolResult[]? toolResults = null, GenerationData? generationData = null)
 		{
 			Role = role;
 			Text = text;
 			ToolCalls = toolCalls;
 			ToolResults = toolResults;
+			Generation = generationData;
 		}
 
 		public class ToolCall
@@ -38,6 +40,18 @@
 			{
 				Id = id;
 				Output = output;
+			}
+		}
+
+		public class GenerationData
+		{
+			public int InputTokens { get; }
+			public int OutputTokens { get; }
+
+			internal GenerationData(int inputTokens, int outputTokens)
+			{
+				InputTokens = inputTokens;
+				OutputTokens = outputTokens;
 			}
 		}
 	}

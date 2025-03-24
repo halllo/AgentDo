@@ -96,12 +96,48 @@ namespace AgentDo.Tests.Bedrock
 			},
 		});
 
+		Document personSchemaAmazonJsonString = Document.FromObject(ThirdParty.Json.LitJson.JsonMapper.ToObject("""
+		{
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"description": "The name of the person."
+				},
+				"age": {
+					"type": "integer",
+					"description": "The age of the person."
+				},
+				"address": {
+					"type": ["object", "null"],
+					"description": "The address of the person.",
+					"properties": {
+						"street": {
+							"type": "string"
+						},
+						"city": {
+							"type": "string"
+						}
+					},
+					"required": [ "city" ]
+				}
+			},
+			"required": [ "name", "age" ]
+		}
+		"""));
+
 		[TestMethod]
 		public void AmazonJsonMarshallingObject()
 		{
 			var schemaString = JsonSchemaExtensions.JsonSchemaString<Person>();
 
 			Assert.AreEqual(schemaString, schemaString.ToAmazonJson().FromAmazonJson());
+		}
+
+		[TestMethod]
+		public void AmazonJsonMarshallingString()
+		{
+			Assert.AreEqual(personSchemaAmazonJson.FromAmazonJson(), personSchemaAmazonJsonString.FromAmazonJson());
 		}
 
 		[TestMethodWithDI]

@@ -8,18 +8,18 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Vision1Test
+	public sealed class VisionDoc1Test
 	{
 		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, [property: Description("Pay attention if its positive or negative.")] Amount NewSaldo);
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockConverseWithImageAndSelfConvertingSchema(IAmazonBedrockRuntime bedrock)
+		public async Task BedrockConverseWithDocumentAndSchemaAndSeparateDeserialized(IAmazonBedrockRuntime bedrock)
 		{
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			using var document = Document.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF"));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
-				ConversationRole.User.Says(BedrockAgent.ClaudeChainOfThoughPrompt + "Here is my credit card statement.", image.ForBedrock()),
+				ConversationRole.User.Says(BedrockAgent.ClaudeChainOfThoughPrompt + "Here is my credit card statement.", document.ForBedrock()),
 			};
 
 			var tool = new Amazon.BedrockRuntime.Model.Tool()

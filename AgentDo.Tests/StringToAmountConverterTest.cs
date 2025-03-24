@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using AgentDo.Content;
+using System.Text.Json;
 
 namespace AgentDo.Tests
 {

@@ -3,23 +3,47 @@ using AgentDo.Content;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.Text.Json;
+using static System.Net.Mime.MediaTypeNames;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class Vision1Test
+	public sealed class VisionDoc0Test
 	{
 		record CreditCardStatement(DateTime Start, DateTime End, string Number, Booking[] Bookings, [property: Description("Pay attention if its positive or negative.")] Amount NewSaldo);
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockConverseWithImageAndSelfConvertingSchema(IAmazonBedrockRuntime bedrock)
+		public async Task BedrockConverseWithDocumentAndSchemaAndSeparateDeserialized(IAmazonBedrockRuntime bedrock)
 		{
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			var pdf = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
+			using var pdfStream = new MemoryStream(File.ReadAllBytes(pdf.FullName));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
-				ConversationRole.User.Says(BedrockAgent.ClaudeChainOfThoughPrompt + "Here is my credit card statement.", image.ForBedrock()),
+				new()
+				{
+					Role = ConversationRole.User,
+					Content =
+					[
+						new ContentBlock
+						{
+							Text = "Here is my credit card statement."
+						},
+						new ContentBlock
+						{
+							Document = new DocumentBlock
+							{
+								Name = Path.GetFileNameWithoutExtension(pdf.Name),
+								Format = DocumentFormat.Pdf,
+								Source = new DocumentSource
+								{
+									Bytes = pdfStream,
+								},
+							},
+						},
+					]
+				},
 			};
 
 			var tool = new Amazon.BedrockRuntime.Model.Tool()

@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AgentDo
+namespace AgentDo.Content
 {
 	/// <summary>
 	/// Represents an amount of money. It can convert itself from a string and supports both German and English decimal and thousands separator.
@@ -17,7 +17,7 @@ namespace AgentDo
 			if (reader.TokenType == JsonTokenType.String)
 			{
 				var numberString = reader.GetString()!;
-				Console.Write("Converting " + numberString);
+				//Console.Write("Converting " + numberString);
 
 				// Remove any spaces
 				numberString = numberString.Replace(" ", "");
@@ -53,8 +53,7 @@ namespace AgentDo
 
 				if (decimal.TryParse(numberString, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal converted))
 				{
-
-					Console.WriteLine(" into " + converted);
+					//Console.WriteLine(" into " + converted);
 					return new Amount(converted);
 				}
 

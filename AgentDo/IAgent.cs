@@ -1,4 +1,6 @@
-﻿namespace AgentDo
+﻿using AgentDo.Content;
+
+namespace AgentDo
 {
 	public interface IAgent
 	{

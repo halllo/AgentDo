@@ -7,40 +7,29 @@ using System.Text.Json.Nodes;
 
 namespace AgentDo
 {
-	public abstract class ToolUsing<TTool, TToolUse, TToolResult>
+	public class ToolUsing
 	{
-		public TTool GetToolDefinition(Tool tool)
+		public static JsonObject GetInputsAsSchema(MethodInfo method)
 		{
-			var method = tool.Delegate.GetMethodInfo();
-			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
-
-			if (tool.Schema != null)
+			var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
+			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
 			{
-				return CreateTool(tool.Name, methodDescription, tool.Schema);
-			}
-			else
+				Type = p.ParameterType,
+				p.GetCustomAttribute<DescriptionAttribute>()?.Description,
+				Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
+			});
+
+			var schema = new JsonObject
 			{
-				var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
-				var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
-				{
-					Type = p.ParameterType,
-					p.GetCustomAttribute<DescriptionAttribute>()?.Description,
-					Required = p.GetCustomAttribute<RequiredAttribute>() != null || !IsNullable(p),
-				});
+				["type"] = "object",
+				["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
+					key: p.Key,
+					value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
+				["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
+			};
+			return schema;
 
-				var schema = new JsonObject
-				{
-					["type"] = "object",
-					["properties"] = new JsonObject(toolPropertiesDictionary.Select(p => new KeyValuePair<string, JsonNode?>(
-						key: p.Key,
-						value: p.Value.Type.ToJsonSchema(p.Value.Description)))),
-					["required"] = new JsonArray(toolPropertiesDictionary.Where(kvp => kvp.Value.Required).Select(kvp => (JsonNode)kvp.Key).ToArray()),
-				};
-
-				return CreateTool(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
-			}
-
-			///copilot generated, not sure if it's correct
+			///copilot generated, not sure if it's 100% correct
 			static bool IsNullable(ParameterInfo parameter)
 			{
 				if (parameter.ParameterType.IsValueType)
@@ -62,6 +51,57 @@ namespace AgentDo
 				}
 
 				return false;
+			}
+		}
+
+		public static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null)
+		{
+			var method = tool.GetMethodInfo();
+
+			var autoDiscoverConverters = new AutoDiscoverConverters();
+			var parameters = method.GetParameters()
+				.Select(p =>
+					p.ParameterType == typeof(Tool.Context) ? context :
+					p.ParameterType == typeof(JsonObject) ? inputs :
+					p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
+					inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
+				)
+				.ToArray();
+
+			beforeInvoke?.Invoke(parameters);
+
+			var returnValue = tool.DynamicInvoke(parameters);
+			object? result;
+			if (returnValue is Task task)
+			{
+				await task;
+				var taskResult = task.GetType().GetProperty("Result").GetValue(task);
+				result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
+			}
+			else
+			{
+				result = returnValue;
+			}
+
+			return result;
+		}
+	}
+
+	public abstract class ToolUsing<TTool, TToolUse, TToolResult> : ToolUsing
+	{
+		public TTool GetToolDefinition(Tool tool)
+		{
+			var method = tool.Delegate.GetMethodInfo();
+			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
+
+			if (tool.Schema != null)
+			{
+				return CreateTool(tool.Name, methodDescription, tool.Schema);
+			}
+			else
+			{
+				JsonObject schema = GetInputsAsSchema(method);
+				return CreateTool(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
 			}
 		}
 
@@ -94,34 +134,13 @@ namespace AgentDo
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
-			var method = tool.Delegate.GetMethodInfo();
 
 			try
 			{
-				var autoDiscoverConverters = new AutoDiscoverConverters();
-				var parameters = method.GetParameters()
-					.Select(p =>
-						p.ParameterType == typeof(Tool.Context) ? context :
-						p.ParameterType == typeof(JsonObject) ? inputs :
-						p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
-						inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
-					)
-					.ToArray();
-
-				logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
-
-				var returnValue = tool.Delegate.DynamicInvoke(parameters);
-				object? result;
-				if (returnValue is Task task)
+				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
 				{
-					await task;
-					var taskResult = task.GetType().GetProperty("Result").GetValue(task);
-					result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
-				}
-				else
-				{
-					result = returnValue;
-				}
+					logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
+				});
 
 				logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
 				return GetAsToolResult(toolUse, result);

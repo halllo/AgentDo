@@ -4,6 +4,7 @@ using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -37,7 +38,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
 		{
 			var taskMessage = ConversationRole.User.Says(
-				text: ClaudeChainOfThoughPrompt + task.Text,
+				text: (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) + task.Text,
 				images: task.Images.Select(i => i.ForBedrock()),
 				documents: task.Documents.Select(d => d.ForBedrock()));
 
@@ -60,6 +61,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			Tool.Context context = new();
 			while (keepConversing)
 			{
+				var converseDurationStopwatch = Stopwatch.StartNew();
 				var response = await bedrock.ConverseAsync(new ConverseRequest
 				{
 					ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
@@ -67,6 +69,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					ToolConfig = toolConfig,
 					InferenceConfig = inferenceConfig,
 				});
+				converseDurationStopwatch.Stop();
 
 				var responseMessage = response.Output.Message;
 				messages.Add(responseMessage);
@@ -96,7 +99,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					resultMessages.Add(new Message(responseMessage.Role, text,
 						toolCalls: [.. toolsUse.Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson()))],
 						toolResults: null,
-						generationData: new Message.GenerationData(response.Usage.InputTokens, response.Usage.OutputTokens)));
+						generationData: new Message.GenerationData(converseDurationStopwatch.Elapsed, response.Usage.InputTokens, response.Usage.OutputTokens)));
 
 					if (!context.Cancelled)
 					{
@@ -107,7 +110,9 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				else
 				{
 					keepConversing = false;
-					resultMessages.Add(new Message(responseMessage.Role, text, null, null, new Message.GenerationData(response.Usage.InputTokens, response.Usage.OutputTokens)));
+					resultMessages.Add(new Message(responseMessage.Role, text,
+						null, null,
+						new Message.GenerationData(converseDurationStopwatch.Elapsed, response.Usage.InputTokens, response.Usage.OutputTokens)));
 				}
 			}
 

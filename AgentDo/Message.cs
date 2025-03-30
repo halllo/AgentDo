@@ -45,11 +45,13 @@
 
 		public class GenerationData
 		{
+			public TimeSpan Duration { get; set; }
 			public int InputTokens { get; }
 			public int OutputTokens { get; }
 
-			internal GenerationData(int inputTokens, int outputTokens)
+			internal GenerationData(TimeSpan duration, int inputTokens, int outputTokens)
 			{
+				Duration = duration;
 				InputTokens = inputTokens;
 				OutputTokens = outputTokens;
 			}

@@ -37,13 +37,19 @@ DO NOT ask for more information on optional parameters if it is not provided.
 
 		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
+			var previousMessages = task.PreviousMessages
+				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
+				.Select(m => m.Role == ConversationRole.User ? ConversationRole.User.Says(m.Text) : ConversationRole.Assistant.Says(m.Text))
+				.ToList();
+
+			var useSystemPrompt = !previousMessages.Any();
 			var taskMessage = ConversationRole.User.Says(
-				text: (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) + task.Text,
+				text: (useSystemPrompt ? (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) : string.Empty) + task.Text,
 				images: task.Images.Select(i => i.ForBedrock()),
 				documents: task.Documents.Select(d => d.ForBedrock()));
 
-			var messages = new List<Amazon.BedrockRuntime.Model.Message> { taskMessage };
-			var resultMessages = new List<Message> { new(taskMessage.Role, taskMessage.Text()) };
+			var messages = previousMessages.Concat([taskMessage]).ToList();
+			var resultMessages = task.PreviousMessages.Concat([new(taskMessage.Role, taskMessage.Text())]).ToList();
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
 
@@ -78,6 +84,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogInformation("{Role}: {Text}", responseMessage.Role, text);
+					context.Text = text;
 				}
 
 				if (response.StopReason == StopReason.Tool_use)

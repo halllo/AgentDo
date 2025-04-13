@@ -1,4 +1,6 @@
-﻿namespace AgentDo
+﻿using System.Text.Json;
+
+namespace AgentDo
 {
 	public class Message
 	{
@@ -7,6 +9,13 @@
 		public ToolCall[]? ToolCalls { get; }
 		public ToolResult[]? ToolResults { get; }
 		public GenerationData? Generation { get; }
+
+		public string GetTextualRepresentation()
+		{
+			var toolCalls = string.Join("\n", (ToolCalls ?? []).Select(t => JsonSerializer.Serialize(t)));
+			var toolResults = string.Join("\n", (ToolResults ?? []).Select(t => JsonSerializer.Serialize(t)));
+			return $"{Text}\n{toolCalls}{toolResults}".Trim();
+		}
 
 		internal Message(string role, string text, ToolCall[]? toolCalls = null, ToolResult[]? toolResults = null, GenerationData? generationData = null)
 		{

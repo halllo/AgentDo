@@ -23,10 +23,15 @@ namespace AgentDo.OpenAI.Like
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 
-			var messages = new List<OpenAILikeClient.Message>();
-			var resultMessages = new List<Message>();
+			var previousMessages = task.PreviousMessages
+				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
+				.Select(m => new OpenAILikeClient.Message(m.Role, m.Text))
+				.ToList();
 
-			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt))
+			var messages = previousMessages;
+			var resultMessages = task.PreviousMessages.ToList();
+
+			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt) && !previousMessages.Any())
 			{
 				var systemMessage = new OpenAILikeClient.Message("system", options.Value.SystemPrompt!);
 				messages.Add(systemMessage);
@@ -56,6 +61,7 @@ namespace AgentDo.OpenAI.Like
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogInformation("{Role}: {Text}", completion.Message.Role, text);
+					context.Text = text;
 				}
 
 				switch (completion.FinishReason)
@@ -104,8 +110,8 @@ namespace AgentDo.OpenAI.Like
 		protected override OpenAILikeClient.Message GetAsToolResult(OpenAILikeClient.ToolCall toolUse, object? result)
 		{
 			return new OpenAILikeClient.Message(
-				Role: "tool", 
-				Content: JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions), 
+				Role: "tool",
+				Content: JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions),
 				ToolCallId: toolUse.Id);
 		}
 	}

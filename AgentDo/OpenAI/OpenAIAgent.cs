@@ -24,10 +24,19 @@ namespace AgentDo.OpenAI
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 
-			var messages = new List<ChatMessage>();
-			var resultMessages = new List<Message>();
+			var previousMessages = task.PreviousMessages
+				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
+				.Select(m => m.Role == ChatMessageRole.User.ToString() ? (ChatMessage)new UserChatMessage(m.Text)
+						   : m.Role == ChatMessageRole.Assistant.ToString() ? new AssistantChatMessage(m.Text)
+						   : m.Role == ChatMessageRole.System.ToString() ? new SystemChatMessage(m.Text)
+						   : m.Role == ChatMessageRole.Tool.ToString() ? new UserChatMessage(m.Text)
+						   : throw new ArgumentOutOfRangeException())
+				.ToList();
 
-			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt))
+			var messages = previousMessages;
+			var resultMessages = task.PreviousMessages.ToList();
+
+			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt) && !previousMessages.Any())
 			{
 				var systemMessage = new SystemChatMessage(options.Value.SystemPrompt);
 				messages.Add(systemMessage);
@@ -60,6 +69,7 @@ namespace AgentDo.OpenAI
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogInformation("{Role}: {Text}", completion.Role, text);
+					context.Text = text;
 				}
 
 				switch (completion.FinishReason)

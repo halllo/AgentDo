@@ -4,6 +4,6 @@ namespace AgentDo
 {
 	public interface IAgent
 	{
-		Task<List<Message>> Do(Prompt task, List<Tool> tools);
+		Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default);
 	}
 }

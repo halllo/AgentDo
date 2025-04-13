@@ -54,7 +54,7 @@ namespace AgentDo
 			}
 		}
 
-		public static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null)
+		public static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null, CancellationToken cancellationToken = default)
 		{
 			var method = tool.GetMethodInfo();
 
@@ -107,7 +107,7 @@ namespace AgentDo
 
 		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
 
-		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false)
+		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
 		{
 			var requestedToolName = GetToolName(toolUse).name;
 			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
@@ -126,11 +126,11 @@ namespace AgentDo
 			}
 			else
 			{
-				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema);
+				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema, cancellationToken: cancellationToken);
 			}
 		}
 
-		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false)
+		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
@@ -140,7 +140,7 @@ namespace AgentDo
 				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
 				{
 					logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
-				});
+				}, cancellationToken);
 
 				logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
 				return GetAsToolResult(toolUse, result);

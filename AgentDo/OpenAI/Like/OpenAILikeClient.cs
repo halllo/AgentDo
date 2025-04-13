@@ -37,7 +37,7 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<CompletionResponse> ChatCompletion(IEnumerable<Message> messages, IEnumerable<Tool> tools)
+		public async Task<CompletionResponse> ChatCompletion(IEnumerable<Message> messages, IEnumerable<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			var content = new
 			{
@@ -80,7 +80,7 @@ namespace AgentDo.OpenAI.Like
 			var jsonContent = JsonSerializer.Serialize(content, snakeCaseLower);
 			var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-			var response = await http.PostAsync("v1/chat/completions", httpContent);
+			var response = await http.PostAsync("v1/chat/completions", httpContent, cancellationToken);
 			response.EnsureSuccessStatusCode();
 
 			var responseBody = await response.Content.ReadAsStringAsync();

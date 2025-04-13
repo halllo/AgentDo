@@ -21,12 +21,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.414.4" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.3" />
+		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.418.3" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.4" />
 		<PackageReference Include="OpenAI" Version="2.1.0" />
 		<PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-		<PackageReference Include="System.Text.Json" Version="9.0.3" />
+		<PackageReference Include="System.Text.Json" Version="9.0.4" />
 	</ItemGroup>
 
 </Project>

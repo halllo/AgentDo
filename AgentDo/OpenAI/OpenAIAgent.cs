@@ -20,7 +20,7 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
+		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 
@@ -53,7 +53,7 @@ namespace AgentDo.OpenAI
 			Tool.Context context = new();
 			while (keepConversing)
 			{
-				ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions);
+				ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken);
 				messages.Add(new AssistantChatMessage(completion));
 
 				var text = completion.Text();
@@ -68,9 +68,10 @@ namespace AgentDo.OpenAI
 						{
 							foreach (var toolCall in completion.ToolCalls)
 							{
+								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Role.ToString(), text, [new Message.ToolCall(toolCall.FunctionName, toolCall.Id, GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions))], null));
 
-								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger);
+								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
 								messages.Add(toolResultMessage);
 
 								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content[0].Text)]));

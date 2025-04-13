@@ -19,7 +19,7 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
+		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 
@@ -49,7 +49,7 @@ namespace AgentDo.OpenAI.Like
 			Tool.Context context = new();
 			while (keepConversing)
 			{
-				var completion = await client.ChatCompletion(messages, toolDefinitions);
+				var completion = await client.ChatCompletion(messages, toolDefinitions, cancellationToken);
 				messages.Add(completion.Message);
 
 				var text = completion.Message.Content;
@@ -64,9 +64,10 @@ namespace AgentDo.OpenAI.Like
 						{
 							foreach (var toolCall in completion.Message.ToolCalls ?? [])
 							{
+								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall(toolCall.Function.Name, toolCall.Id, GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions))], null));
 
-								var toolResultMessage = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools);
+								var toolResultMessage = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 								messages.Add(toolResultMessage);
 
 								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content!)]));

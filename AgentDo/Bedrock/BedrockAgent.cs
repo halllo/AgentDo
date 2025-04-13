@@ -35,7 +35,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools)
+		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			var taskMessage = ConversationRole.User.Says(
 				text: (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) + task.Text,
@@ -68,7 +68,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					Messages = messages,
 					ToolConfig = toolConfig,
 					InferenceConfig = inferenceConfig,
-				});
+				}, cancellationToken);
 				converseDurationStopwatch.Stop();
 
 				var responseMessage = response.Output.Message;
@@ -86,7 +86,8 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					var toolResults = new List<ToolResultBlock>();
 					foreach (var toolUse in toolsUse)
 					{
-						var toolResult = await Use(tools, toolUse, responseMessage.Role, context, logger);
+						cancellationToken.ThrowIfCancellationRequested();
+						var toolResult = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
 						toolResults.Add(toolResult);
 
 						if (context.Cancelled)

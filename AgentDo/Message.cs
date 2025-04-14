@@ -4,17 +4,21 @@ namespace AgentDo
 {
 	public class Message
 	{
-		public string Role { get; }
-		public string Text { get; }
-		public ToolCall[]? ToolCalls { get; }
-		public ToolResult[]? ToolResults { get; }
-		public GenerationData? Generation { get; }
+		public string Role { get; set; } = null!;
+		public string Text { get; set; } = null!;
+		public ToolCall[]? ToolCalls { get; set; }
+		public ToolResult[]? ToolResults { get; set; }
+		public GenerationData? Generation { get; set; }
 
 		public string GetTextualRepresentation()
 		{
 			var toolCalls = string.Join("\n", (ToolCalls ?? []).Select(t => JsonSerializer.Serialize(t)));
 			var toolResults = string.Join("\n", (ToolResults ?? []).Select(t => JsonSerializer.Serialize(t)));
 			return $"{Text}\n{toolCalls}{toolResults}".Trim();
+		}
+
+		public Message()
+		{
 		}
 
 		internal Message(string role, string text, ToolCall[]? toolCalls = null, ToolResult[]? toolResults = null, GenerationData? generationData = null)
@@ -28,42 +32,23 @@ namespace AgentDo
 
 		public class ToolCall
 		{
-			public string Name { get; }
-			public string Id { get; }
-			public string Input { get; }
-
-			internal ToolCall(string name, string id, string input)
-			{
-				Name = name;
-				Id = id;
-				Input = input;
-			}
+			public string Name { get; set; } = null!;
+			public string Id { get; set; } = null!;
+			public string Input { get; set; } = null!;
 		}
 
 		public class ToolResult
 		{
-			public string Id { get; }
-			public string Output { get; }
-
-			internal ToolResult(string id, string output)
-			{
-				Id = id;
-				Output = output;
-			}
+			public string Id { get; set; } = null!;
+			public string Output { get; set; } = null!;
 		}
 
 		public class GenerationData
 		{
+			public DateTimeOffset GeneratedAt { get; set; }
 			public TimeSpan Duration { get; set; }
-			public int InputTokens { get; }
-			public int OutputTokens { get; }
-
-			internal GenerationData(TimeSpan duration, int inputTokens, int outputTokens)
-			{
-				Duration = duration;
-				InputTokens = inputTokens;
-				OutputTokens = outputTokens;
-			}
+			public int InputTokens { get; set; }
+			public int OutputTokens { get; set; }
 		}
 	}
 }

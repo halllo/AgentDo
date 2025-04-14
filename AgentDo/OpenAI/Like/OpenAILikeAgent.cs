@@ -71,12 +71,12 @@ namespace AgentDo.OpenAI.Like
 							foreach (var toolCall in completion.Message.ToolCalls ?? [])
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall(toolCall.Function.Name, toolCall.Id, GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions))], null));
+								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.Function.Name, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
 
 								var toolResultMessage = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 								messages.Add(toolResultMessage);
 
-								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content!)]));
+								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content! }]));
 							}
 							break;
 						}

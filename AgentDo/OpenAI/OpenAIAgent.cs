@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -62,7 +63,9 @@ namespace AgentDo.OpenAI
 			Tool.Context context = new();
 			while (keepConversing)
 			{
+				var chatDurationStopwatch = Stopwatch.StartNew();
 				ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken);
+				chatDurationStopwatch.Stop();
 				messages.Add(new AssistantChatMessage(completion));
 
 				var text = completion.Text();
@@ -79,18 +82,25 @@ namespace AgentDo.OpenAI
 							foreach (var toolCall in completion.ToolCalls)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Role.ToString(), text, [new Message.ToolCall(toolCall.FunctionName, toolCall.Id, GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions))], null));
+								resultMessages.Add(new(completion.Role.ToString(), text, 
+									toolCalls: [new Message.ToolCall { Name = toolCall.FunctionName, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }], 
+									toolResults: null, 
+									generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed }));
 
 								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
 								messages.Add(toolResultMessage);
 
-								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult(toolCall.Id, toolResultMessage.Content[0].Text)]));
+								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
 							}
 							break;
 						}
 					default:
 						{
-							resultMessages.Add(new(completion.Role.ToString(), text, null, null));
+							resultMessages.Add(new(completion.Role.ToString(), text, null, null, new Message.GenerationData
+							{
+								GeneratedAt = DateTimeOffset.UtcNow,
+								Duration = chatDurationStopwatch.Elapsed,
+							}));
 							keepConversing = false;
 							break;
 						}

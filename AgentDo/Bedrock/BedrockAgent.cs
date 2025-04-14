@@ -105,14 +105,14 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					}
 
 					resultMessages.Add(new Message(responseMessage.Role, text,
-						toolCalls: [.. toolsUse.Select(t => new Message.ToolCall(t.Name, t.ToolUseId, t.Input.FromAmazonJson()))],
+						toolCalls: [.. toolsUse.Select(t => new Message.ToolCall { Name = t.Name, Id = t.ToolUseId, Input = t.Input.FromAmazonJson() })],
 						toolResults: null,
-						generationData: new Message.GenerationData(converseDurationStopwatch.Elapsed, response.Usage.InputTokens, response.Usage.OutputTokens)));
+						generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens }));
 
 					if (!context.Cancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
-						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult(t.ToolUseId, t.Content.FirstOrDefault().Json.FromAmazonJson()))]));
+						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
 				}
 				else
@@ -120,7 +120,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					keepConversing = false;
 					resultMessages.Add(new Message(responseMessage.Role, text,
 						null, null,
-						new Message.GenerationData(converseDurationStopwatch.Elapsed, response.Usage.InputTokens, response.Usage.OutputTokens)));
+						new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens }));
 				}
 			}
 

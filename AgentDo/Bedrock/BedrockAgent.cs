@@ -162,18 +162,28 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				[
 					new ToolResultContentBlock
 					{
-						Json = Amazon.Runtime.Documents.Document.FromObject(result switch
+						Json = result switch
 						{
-							null => new { },
-							bool b => new { result = b },
-							int i => new { result = i },
-							long l => new { result = l },
-							double d => new { result = d },
-							string s => new { result = s },
-							Array a => new { result = a },
-							IList c => new { result = c },
-							_ => result,
-						}),
+							JsonElement { ValueKind: JsonValueKind.Array } j => j.ToString().ToAmazonJson(),
+							JsonElement { ValueKind: JsonValueKind.Object } j => j.ToString().ToAmazonJson(),
+							_ => Amazon.Runtime.Documents.Document.FromObject(result switch
+							{
+								null => new { },
+								bool b => new { result = b },
+								int i => new { result = i },
+								long l => new { result = l },
+								double d => new { result = d },
+								string s => new { result = s },
+								Array a => new { result = a },
+								IList c => new { result = c },
+								JsonElement { ValueKind: JsonValueKind.Null } j => new { },
+								JsonElement { ValueKind: JsonValueKind.True } j => new { result = j.GetBoolean() },
+								JsonElement { ValueKind: JsonValueKind.False } j => new { result = j.GetBoolean() },
+								JsonElement { ValueKind: JsonValueKind.Number } j => new { result = j.GetDouble() },
+								JsonElement { ValueKind: JsonValueKind.String } j => new { result = j.GetString() },
+								_ => result,
+							}),
+						}
 					}
 				]
 			};

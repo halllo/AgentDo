@@ -1,7 +1,9 @@
-﻿using System.ComponentModel;
+﻿using Microsoft.Extensions.AI;
+using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace AgentDo
@@ -35,6 +37,19 @@ namespace AgentDo
 		{
 			string actualToolName = GetToolName(tool, toolName);
 			return new Tool(actualToolName, tool, schema);
+		}
+
+		public static Tool From(AIFunction aiFunction)
+		{
+			return new Tool(
+				name: aiFunction.Name, 
+				tool: async (JsonObject i) =>
+				{
+					var arguments = i.Deserialize<Dictionary<string, object?>>();
+					var result = await aiFunction.InvokeAsync(new AIFunctionArguments(arguments));
+					return result;
+				}, 
+				schema: JsonDocument.Parse(aiFunction.JsonSchema.ToString()));
 		}
 
 		private static string GetToolName(Delegate tool, string toolName)

@@ -14,14 +14,16 @@
 		<PackageProjectUrl>https://github.com/halllo/AgentDo</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/halllo/AgentDo</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<None Include="../README.md" Pack="true" PackagePath="\" />
+		<None Include="../LICENSE" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.418.3" />
+		<PackageReference Include="AWSSDK.BedrockRuntime" Version="3.7.418.8" />
 		<PackageReference Include="Microsoft.Extensions.AI" Version="9.4.0-preview.1.25207.5" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.4" />

@@ -1,4 +1,5 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 
 namespace AgentDo.Tests.Bedrock
@@ -69,7 +70,7 @@ namespace AgentDo.Tests.Bedrock
 						}),
 						*/
 
-						Json = Amazon.Runtime.Documents.Document.FromObject(ThirdParty.Json.LitJson.JsonMapper.ToObject("""
+						Json = AmazonJsonExtensions.ToAmazonJson("""
 						{
 							"type": "object",
 							"properties": {
@@ -97,7 +98,7 @@ namespace AgentDo.Tests.Bedrock
 							},
 							"required": [ "name" ]
 						}
-						""")),
+						"""),
 					},
 				}
 			};

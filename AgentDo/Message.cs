@@ -47,8 +47,8 @@ namespace AgentDo
 		{
 			public DateTimeOffset GeneratedAt { get; set; }
 			public TimeSpan Duration { get; set; }
-			public int InputTokens { get; set; }
-			public int OutputTokens { get; set; }
+			public int? InputTokens { get; set; }
+			public int? OutputTokens { get; set; }
 		}
 	}
 }

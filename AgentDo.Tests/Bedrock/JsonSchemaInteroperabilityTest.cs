@@ -96,7 +96,7 @@ namespace AgentDo.Tests.Bedrock
 			},
 		});
 
-		Document personSchemaAmazonJsonString = Document.FromObject(ThirdParty.Json.LitJson.JsonMapper.ToObject("""
+		Document personSchemaAmazonJsonString = AmazonJsonExtensions.ToAmazonJson("""
 		{
 			"type": "object",
 			"properties": {
@@ -124,7 +124,7 @@ namespace AgentDo.Tests.Bedrock
 			},
 			"required": [ "name", "age" ]
 		}
-		"""));
+		""");
 
 		[TestMethod]
 		public void AmazonJsonMarshallingObject()

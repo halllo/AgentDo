@@ -1,10 +1,10 @@
 ﻿using Amazon.Runtime.Documents;
 using Amazon.Runtime.Documents.Internal.Transform;
 using Amazon.Runtime.Internal.Transform;
+using Amazon.Runtime.Internal.Util;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using ThirdParty.Json.LitJson;
 
 namespace AgentDo.Bedrock
 {
@@ -16,8 +16,9 @@ namespace AgentDo.Bedrock
 		{
 			using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
 			using var context = new JsonUnmarshallerContext(stream, false, null);
+			var reader = new StreamingUtf8JsonReader(stream);
 			var unmarshaller = DocumentUnmarshaller.Instance;
-			var unmarshalled = unmarshaller.Unmarshall(context);
+			var unmarshalled = unmarshaller.Unmarshall(context, ref reader);
 			return unmarshalled;
 
 			//return Document.FromObject(JsonMapper.ToObject(json)); //cannot deserialize "default":null but throws NRE
@@ -27,10 +28,11 @@ namespace AgentDo.Bedrock
 		{
 			if (amazonJson.IsDictionary() || amazonJson.IsList())
 			{
-				var sb = new StringBuilder();
-				var jsonWriter = new JsonWriter(sb);
+				using var stream = new MemoryStream();
+				var jsonWriter = new Utf8JsonWriter(stream);
 				DocumentMarshaller.Instance.Write(jsonWriter, amazonJson);
-				var marshalled = sb.ToString();
+				jsonWriter.Flush();
+				var marshalled = Encoding.UTF8.GetString(stream.ToArray());
 				return marshalled;
 			}
 			else

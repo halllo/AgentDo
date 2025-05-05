@@ -5,6 +5,7 @@
       //"commandLineArgs": "bedrock-models"
       "commandLineArgs": "task \"Help me deal the documents (pdfs only) in 'C:\\Users\\manue\\Downloads\\Inbox'\"",
       //"commandLineArgs": "classify --config classification.json \"C:\\Users\\manue\\Downloads\\Inbox\\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF\""
+      //"commandLineArgs": "mcp \"I would like to register Manuel Naujoks from Karlsruhe.\""
     }
   }
 }

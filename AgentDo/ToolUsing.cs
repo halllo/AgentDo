@@ -76,7 +76,7 @@ namespace AgentDo
 			{
 				await task;
 				var taskResult = task.GetType().GetProperty("Result").GetValue(task);
-				result = taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
+				result = taskResult == null || taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
 			}
 			else
 			{
@@ -139,10 +139,10 @@ namespace AgentDo
 			{
 				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
 				{
-					logger?.LogInformation("{Role}: Invoking {ToolUse}({@Parameters})...", role, name, parameters);
+					logger?.LogInformation("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
 				}, cancellationToken);
 
-				logger?.LogInformation("{Tool}: {@Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, result);
+				logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
 				return GetAsToolResult(toolUse, result);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)

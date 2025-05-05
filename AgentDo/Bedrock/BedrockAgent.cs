@@ -43,10 +43,12 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				.ToList();
 
 			var useSystemPrompt = !previousMessages.Any();
+			var images = task.Images.Select(i => i.ForBedrock()).ToList();
+			var documents = task.Documents.Select(d => d.ForBedrock()).ToList();
 			var taskMessage = ConversationRole.User.Says(
 				text: (useSystemPrompt ? (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) : string.Empty) + task.Text,
-				images: task.Images.Select(i => i.ForBedrock()),
-				documents: task.Documents.Select(d => d.ForBedrock()));
+				images: images,
+				documents: documents);
 
 			var messages = previousMessages.Concat([taskMessage]).ToList();
 			var resultMessages = task.PreviousMessages.Concat([new(taskMessage.Role, taskMessage.Text())]).ToList();
@@ -75,6 +77,15 @@ DO NOT ask for more information on optional parameters if it is not provided.
 					ToolConfig = toolConfig,
 					InferenceConfig = inferenceConfig,
 				}, cancellationToken);
+
+				//rewind streams in case we want to send them again
+				foreach (var stream in Enumerable
+					.Concat(images.Select(i => i.Source.Bytes), documents.Select(d => d.Source.Bytes))
+					.Where(s => s.CanSeek))
+				{
+					stream.Seek(0, SeekOrigin.Begin);
+				}
+
 				converseDurationStopwatch.Stop();
 
 				var responseMessage = response.Output.Message;

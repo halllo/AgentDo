@@ -1,8 +1,10 @@
 ﻿using AgentDo.Content;
 using CommandLine;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PDFtoImage;
+using System;
 using System.ComponentModel;
 
 namespace AgentDo.Cli.Verbs

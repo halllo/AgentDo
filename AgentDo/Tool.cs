@@ -75,6 +75,7 @@ namespace AgentDo
 		public class Context
 		{
 			public bool Cancelled { get; set; }
+			public bool RememberToolResultWhenCancelled { get; set; }
 			public string? Text { get; set; }
 		}
 	}

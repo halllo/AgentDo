@@ -25,6 +25,14 @@ namespace AgentDo.Tests.Local
 		[TestMethodWithDI]
 		public async Task LocalAgentMultiToolUse([FromKeyedServices("local")] OpenAILikeClient client, ILoggerFactory loggerFactory)
 		{
+			var systemPrompt = @"Answer the user's request using relevant tools (if they are available). 
+First, think about which of the provided tools is the relevant tool to answer the user's request. 
+Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. 
+When deciding if the parameter can be inferred, carefully consider all the context including the return values from other tools to see if it supports optaining a specific value.
+If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call.
+BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead ask the user to provide the missing parameters. 
+DO NOT ask for more information on optional parameters if it is not provided.";
+
 			var agent = new OpenAILikeAgent(
 				client: client,
 				logger: loggerFactory.CreateLogger<OpenAILikeAgent>(),
@@ -32,19 +40,12 @@ namespace AgentDo.Tests.Local
 				{
 					IgnoreInvalidSchema = true,
 					IgnoreUnkownTools = true,
-					SystemPrompt = @"Answer the user's request using relevant tools (if they are available). 
-First, think about which of the provided tools is the relevant tool to answer the user's request. 
-Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. 
-When deciding if the parameter can be inferred, carefully consider all the context including the return values from other tools to see if it supports optaining a specific value.
-If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call.
-BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead ask the user to provide the missing parameters. 
-DO NOT ask for more information on optional parameters if it is not provided."
 				}));
 //Before calling a tool, do some analysis within <thinking></thinking> tags.
 
 			Person? registeredPerson = default;
 			var messages = await agent.Do(
-				task: "I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.",
+				task: new Content.Prompt("I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.", [ new Message { Role = "system", Text = systemPrompt } ]),
 				tools:
 				[
 					Tool.From(toolName: "register_person", tool: [Description("Register person.")] (Person person) =>

@@ -19,7 +19,7 @@ namespace AgentDo.Tests.Bedrock
 			using var document = Document.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF"));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
-				ConversationRole.User.Says(BedrockAgent.ClaudeChainOfThoughPrompt + "Here is my credit card statement.", document.ForBedrock()),
+				ConversationRole.User.Says(Prompt.ClaudeChainOfThought + " Here is my credit card statement.", document.ForBedrock()),
 			};
 
 			var tool = new Amazon.BedrockRuntime.Model.Tool()

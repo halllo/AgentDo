@@ -22,6 +22,7 @@ namespace AgentDo.OpenAI.Like
 		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
+			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
 
 			var previousMessages = task.PreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
@@ -30,13 +31,6 @@ namespace AgentDo.OpenAI.Like
 
 			var messages = previousMessages;
 			var resultMessages = task.PreviousMessages.ToList();
-
-			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt) && !previousMessages.Any())
-			{
-				var systemMessage = new OpenAILikeClient.Message("system", options.Value.SystemPrompt!);
-				messages.Add(systemMessage);
-				resultMessages.Add(new(systemMessage.Role, systemMessage.Content!, null, null));
-			}
 
 			var taskMessage = new OpenAILikeClient.Message("user", task.Text);
 			messages.Add(taskMessage);

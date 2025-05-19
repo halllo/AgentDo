@@ -3,7 +3,6 @@
 	public class OpenAILikeAgentOptions
 	{
 		public bool LogTask { get; set; }
-		public string? SystemPrompt { get; set; }
 		public bool IgnoreInvalidSchema { get; set; }
 		public bool IgnoreUnkownTools { get; set; }
 	}

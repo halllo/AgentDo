@@ -12,18 +12,6 @@ namespace AgentDo.Bedrock
 {
 	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool, ToolUseBlock, ToolResultBlock>, IAgent
 	{
-		//taken from https://docs.anthropic.com/en/docs/build-with-claude/tool-use#chain-of-thought-tool-use
-		public readonly static string ClaudeChainOfThoughPrompt = @"Answer the user's request using relevant tools (if they are available). 
-Before calling a tool, do some analysis within <thinking></thinking> tags. 
-First, think about which of the provided tools is the relevant tool to answer the user's request. 
-Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. 
-When deciding if the parameter can be inferred, carefully consider all the context including the return values from other tools to see if it supports optaining a specific value.
-If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call.
-BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead ask the user to provide the missing parameters. 
-DO NOT ask for more information on optional parameters if it is not provided.
-----
-";
-
 		private readonly IAmazonBedrockRuntime bedrock;
 		private readonly ILogger<BedrockAgent> logger;
 		private readonly IOptions<BedrockAgentOptions> options;
@@ -42,11 +30,10 @@ DO NOT ask for more information on optional parameters if it is not provided.
 				.Select(m => m.Role == ConversationRole.User ? ConversationRole.User.Says(m.Text) : ConversationRole.Assistant.Says(m.Text))
 				.ToList();
 
-			var useSystemPrompt = !previousMessages.Any();
 			var images = task.Images.Select(i => i.ForBedrock()).ToList();
 			var documents = task.Documents.Select(d => d.ForBedrock()).ToList();
 			var taskMessage = ConversationRole.User.Says(
-				text: (useSystemPrompt ? (options.Value.SystemPrompt ?? ClaudeChainOfThoughPrompt) : string.Empty) + task.Text,
+				text: task.Text,
 				images: images,
 				documents: documents);
 
@@ -120,7 +107,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 						toolResults: null,
 						generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens }));
 
-					if (!context.Cancelled)
+					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
 						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));

@@ -24,6 +24,7 @@ namespace AgentDo.OpenAI
 		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
+			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
 
 			var previousMessages = task.PreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
@@ -36,13 +37,6 @@ namespace AgentDo.OpenAI
 
 			var messages = previousMessages;
 			var resultMessages = task.PreviousMessages.ToList();
-
-			if (!string.IsNullOrWhiteSpace(options.Value.SystemPrompt) && !previousMessages.Any())
-			{
-				var systemMessage = new SystemChatMessage(options.Value.SystemPrompt);
-				messages.Add(systemMessage);
-				resultMessages.Add(new(ChatMessageRole.System.ToString(), systemMessage.Text(), null, null));
-			}
 
 			var taskMessage = new UserChatMessage(task.Text);
 			messages.Add(taskMessage);
@@ -82,15 +76,24 @@ namespace AgentDo.OpenAI
 							foreach (var toolCall in completion.ToolCalls)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Role.ToString(), text, 
-									toolCalls: [new Message.ToolCall { Name = toolCall.FunctionName, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }], 
-									toolResults: null, 
+								resultMessages.Add(new(completion.Role.ToString(), text,
+									toolCalls: [new Message.ToolCall { Name = toolCall.FunctionName, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }],
+									toolResults: null,
 									generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed }));
 
 								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
-								messages.Add(toolResultMessage);
 
-								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
+								if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+								{
+									messages.Add(toolResultMessage);
+									resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
+								}
+
+								if (context.Cancelled)
+								{
+									keepConversing = false;
+									break;
+								}
 							}
 							break;
 						}

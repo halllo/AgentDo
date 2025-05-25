@@ -78,9 +78,18 @@ namespace AgentDo
 
 		public class Context
 		{
+			private IReadOnlyList<Message> messages;
+
+			internal Context(IReadOnlyList<Message> messages)
+			{
+				this.messages = messages;
+			}
+
 			public bool Cancelled { get; set; }
 			public bool RememberToolResultWhenCancelled { get; set; }
-			public string? Text { get; set; }
+			public string? Text { get; internal set; }
+
+			public IReadOnlyList<Message> GetMessages() => this.messages;
 		}
 	}
 }

@@ -55,7 +55,7 @@ namespace AgentDo.Bedrock
 			};
 
 			bool keepConversing = true;
-			Tool.Context context = new();
+			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
 				var converseDurationStopwatch = Stopwatch.StartNew();

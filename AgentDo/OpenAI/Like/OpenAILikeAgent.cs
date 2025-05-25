@@ -46,7 +46,7 @@ namespace AgentDo.OpenAI.Like
 			}
 
 			bool keepConversing = true;
-			Tool.Context context = new();
+			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
 				var completion = await client.ChatCompletion(messages, toolDefinitions, cancellationToken);

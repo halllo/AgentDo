@@ -140,7 +140,7 @@ namespace AgentDo
 			}
 			else
 			{
-				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema, cancellationToken: cancellationToken);
+				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema: ignoreInvalidSchema, cancellationToken: cancellationToken);
 			}
 		}
 
@@ -148,6 +148,7 @@ namespace AgentDo
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
+			var logItsAndOutputs = tool.LogInputsAndOutputs;
 
 			if (tool.RequireApproval)
 			{
@@ -159,10 +160,24 @@ namespace AgentDo
 			{
 				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
 				{
-					logger?.LogInformation("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
+					if (logItsAndOutputs)
+					{
+						logger?.LogInformation("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
+					}
+					else
+					{
+						logger?.LogInformation("{Role}: Invoking {ToolUse}()...", role, name);
+					}
 				}, cancellationToken);
 
-				logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
+				if (logItsAndOutputs)
+				{
+					logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
+				}
+				else
+				{
+					logger?.LogInformation("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
+				}
 				return (GetAsToolResult(toolUse, result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)

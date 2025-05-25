@@ -16,33 +16,36 @@ namespace AgentDo
 
 		public bool RequireApproval { get; private set; }
 
+		public bool LogInputsAndOutputs { get; private set; }
+
 		internal JsonDocument? Schema { get; private set; }
 
-		private Tool(string name, Delegate tool, bool requireApproval, JsonDocument? schema)
+		private Tool(string name, Delegate tool, bool logInputsAndOutputs, bool requireApproval, JsonDocument? schema)
 		{
 			this.Name = name;
 			this.Delegate = tool;
+			this.LogInputsAndOutputs = logInputsAndOutputs;
 			this.RequireApproval = requireApproval;
 			this.Schema = schema;
 		}
 
-		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = ""/*, bool requireApproval = false*/)
+		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "", bool logInputsAndOutputs = true/*, bool requireApproval = false*/)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, /*requireApproval*/false, null);
+			return new Tool(actualToolName, tool, logInputsAndOutputs, /*requireApproval*/false, null);
 		}
 
 		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
 		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, T> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
 		public static Tool From(JsonDocument schema, Func<JsonDocument, Task> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
 		public static Tool From<T>(JsonDocument schema, Func<JsonDocument, Task<T>> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
-		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "")
+		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "", bool logInputsAndOutputs = false)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, false, schema);
+			return new Tool(actualToolName, tool, logInputsAndOutputs, false, schema);
 		}
 
-		public static Tool From(AIFunction aiFunction/*, bool requireApproval = false*/)
+		public static Tool From(AIFunction aiFunction, bool logInputsAndOutputs = true/*, bool requireApproval = false*/)
 		{
 			return new Tool(
 				name: aiFunction.Name,
@@ -52,6 +55,7 @@ namespace AgentDo
 					var result = await aiFunction.InvokeAsync(new AIFunctionArguments(arguments));
 					return result;
 				},
+				logInputsAndOutputs: logInputsAndOutputs,
 				requireApproval: /*requireApproval*/false,
 				schema: JsonDocument.Parse(aiFunction.JsonSchema.ToString()));
 		}

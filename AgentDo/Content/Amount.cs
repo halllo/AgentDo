@@ -7,10 +7,10 @@ namespace AgentDo.Content
 	/// <summary>
 	/// Represents an amount of money. It can convert itself from a string and supports both German and English decimal and thousands separator.
 	/// </summary>
-	[ConvertFromString<StringToAmountConverter>]
+	[ConvertFromString<AmountConverter>]
 	public record Amount(decimal Value);
 
-	public class StringToAmountConverter : JsonConverter<Amount>
+	public class AmountConverter : JsonConverter<Amount>
 	{
 		public override Amount Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 		{

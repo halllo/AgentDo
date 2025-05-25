@@ -33,7 +33,7 @@ namespace AgentDo.Tests
 			var serialized = JsonSerializer.Serialize(new { Amount = input });
 			var deserialized = JsonSerializer.Deserialize<ObjectWithAmount>(serialized, new JsonSerializerOptions
 			{
-				Converters = { new StringToAmountConverter() }
+				Converters = { new AmountConverter() }
 			})!;
 			return deserialized.Amount.Value;
 		}

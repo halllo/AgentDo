@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
+using System.Text.Json.Serialization;
 
 namespace AgentDo
 {
@@ -98,19 +99,23 @@ namespace AgentDo
 		internal static object? As(this JsonNode? json, Type type, AutoDiscoverConverters? autoDiscoverConverters = null)
 		{
 			var deserializationOptions = autoDiscoverConverters != null
-				? DeserializationOptions.WithAutoDiscoveredConverters(type, autoDiscoverConverters)
+				? DeserializationOptions.WithConverters(GetAutoDiscoveredConverters(type, autoDiscoverConverters))
 				: DeserializationOptions;
 
 			return As(json, type, deserializationOptions);
 		}
 
-		internal static JsonSerializerOptions WithAutoDiscoveredConverters(this JsonSerializerOptions options, Type type, AutoDiscoverConverters? autoDiscoverConverters = null)
+		internal static IEnumerable<JsonConverter> GetAutoDiscoveredConverters(Type type, AutoDiscoverConverters? autoDiscoverConverters = null)
 		{
 			autoDiscoverConverters ??= new AutoDiscoverConverters();
 			autoDiscoverConverters.CollectRecursivelyFrom(type);
+			return autoDiscoverConverters.GetConverters();
+		}
 
+		internal static JsonSerializerOptions WithConverters(this JsonSerializerOptions options, IEnumerable<JsonConverter> converters)
+		{
 			var newOptions = new JsonSerializerOptions(options);
-			foreach (var converter in autoDiscoverConverters.GetConverters())
+			foreach (var converter in converters)
 			{
 				newOptions.Converters.Add(converter);
 			}
@@ -131,10 +136,10 @@ namespace AgentDo
 			}
 		}
 
-		public static T? As<T>(this JsonDocument? json, bool autoDiscoverConverters = false)
+		public static T? As<T>(this JsonDocument? json, params JsonConverter[] converters)
 		{
-			var deserializationOptions = autoDiscoverConverters
-				? DeserializationOptions.WithAutoDiscoveredConverters(typeof(T))
+			var deserializationOptions = converters.Length > 0
+				? DeserializationOptions.WithConverters(converters)
 				: DeserializationOptions;
 
 			var t = json.As<T>(deserializationOptions);

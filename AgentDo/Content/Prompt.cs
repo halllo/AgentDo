@@ -17,30 +17,30 @@ DO NOT ask for more information on optional parameters if it is not provided.
 		public string Text { get; }
 		public List<Image> Images { get; }
 		public List<Document> Documents { get; }
-		public List<Message> PreviousMessages { get; }
+		public AgentContext? AgentContext { get; }
 
-		public Prompt(string text) : this(text, [], [], [])
+		public Prompt(string text) : this(text, [], [], null)
 		{
 		}
 
-		public Prompt(string text, params IEnumerable<Image> images) : this(text, images, [], [])
+		public Prompt(string text, params IEnumerable<Image> images) : this(text, images, [], null)
 		{
 		}
 
-		public Prompt(string text, params IEnumerable<Document> documents) : this(text, [], documents, [])
+		public Prompt(string text, params IEnumerable<Document> documents) : this(text, [], documents, null)
 		{
 		}
 
-		public Prompt(string text, params IEnumerable<Message> previousMessages) : this(text, [], [], previousMessages)
+		public Prompt(string text, AgentContext? agentContext) : this(text, [], [], agentContext)
 		{
 		}
 
-		public Prompt(string text, IEnumerable<Image> images, IEnumerable<Document> documents, IEnumerable<Message> previousMessages)
+		public Prompt(string text, IEnumerable<Image> images, IEnumerable<Document> documents, AgentContext? agentContext)
 		{
 			Text = text;
 			Images = [.. images];
 			Documents = [.. documents];
-			PreviousMessages = [.. previousMessages];
+			AgentContext = agentContext;
 		}
 
 		public static implicit operator Prompt(string text) => new(text);

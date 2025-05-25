@@ -13,7 +13,7 @@ namespace AgentDo.Tests.Bedrock
 			return new BedrockAgent(null!, null!, null!).GetToolDefinition(tool);
 		}
 
-		public static async Task<ToolResultBlock> UseAsBedrockTool(this Tool tool, ToolUseBlock toolUse, ConversationRole role)
+		public static async Task<(ToolResultBlock?, ToolUsing.ApprovalRequired?)> UseAsBedrockTool(this Tool tool, ToolUseBlock toolUse, ConversationRole role)
 		{
 			return await new BedrockAgent(null!, null!, null!).Use(tool, toolUse, role, null!, null);
 		}

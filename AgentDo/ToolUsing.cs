@@ -85,9 +85,23 @@ namespace AgentDo
 
 			return result;
 		}
+
+		public class ApprovalRequired
+		{
+			public string ToolName { get; } = null!;
+			public string? ToolId { get; }
+			public JsonObject? Inputs { get; }
+
+			internal ApprovalRequired(string name, string? id, JsonObject? inputs)
+			{
+				this.ToolName = name;
+				this.ToolId = id;
+				this.Inputs = inputs;
+			}
+		}
 	}
 
-	public abstract class ToolUsing<TTool, TToolUse, TToolResult> : ToolUsing
+	public abstract class ToolUsing<TTool, TToolUse, TToolResult> : ToolUsing where TToolResult : class
 	{
 		public TTool GetToolDefinition(Tool tool)
 		{
@@ -107,7 +121,7 @@ namespace AgentDo
 
 		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
 
-		internal async Task<TToolResult> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
+		internal async Task<(TToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
 		{
 			var requestedToolName = GetToolName(toolUse).name;
 			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
@@ -117,7 +131,7 @@ namespace AgentDo
 
 				if (ignoreUnknownTools)
 				{
-					return GetAsToolResult(toolUse, "Unknown tool. Dont call again!");
+					return (GetAsToolResult(toolUse, "Unknown tool. Dont call again!"), null);
 				}
 				else
 				{
@@ -130,10 +144,16 @@ namespace AgentDo
 			}
 		}
 
-		public async Task<TToolResult> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
+		public async Task<(TToolResult?, ApprovalRequired?)> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
 		{
 			var (name, id) = GetToolName(toolUse);
 			var inputs = GetToolInputs(toolUse);
+
+			if (tool.RequireApproval)
+			{
+				logger?.LogInformation("{Tool}: Tool {ToolUse} requires approval to invoke.", id, name);
+				return (null, new ApprovalRequired(name, id, inputs));
+			}
 
 			try
 			{
@@ -143,12 +163,12 @@ namespace AgentDo
 				}, cancellationToken);
 
 				logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
-				return GetAsToolResult(toolUse, result);
+				return (GetAsToolResult(toolUse, result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)
 			{
 				logger?.LogError(invalidSchema, "{Role}: Invoking {ToolUse}(@Input) failed because invalid schema.", role, name, inputs);
-				return GetAsToolResult(toolUse, "failed");
+				return (GetAsToolResult(toolUse, "failed"), null);
 			}
 		}
 

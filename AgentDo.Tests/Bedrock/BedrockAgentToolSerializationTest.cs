@@ -137,6 +137,7 @@ namespace AgentDo.Tests.Bedrock
 
 			//Actually processing it though the bedrock agent tool
 			var toolResult = await usableTool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
+			Assert.IsNotNull(toolResult.Item1);
 			Assert.AreEqual("Taylor Swift", toolCall!.Song.Artist.Name);
 			Assert.AreEqual("abc", toolCall!.Song.Artist.Pseudonym);
 			Assert.AreEqual("All Too Well", toolCall!.Song.Name);
@@ -176,6 +177,7 @@ namespace AgentDo.Tests.Bedrock
 
 			//Actually processing it though the bedrock agent tool
 			var toolResult = await usableTool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
+			Assert.IsNotNull(toolResult.Item1);
 			Assert.AreEqual("Taylor Swift", toolCall!.Album.Artist.Name);
 			Assert.AreEqual("RED", toolCall!.Album.Name);
 			Assert.IsNull(toolCall!.Album.CustomAlias);

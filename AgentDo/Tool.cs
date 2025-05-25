@@ -14,19 +14,22 @@ namespace AgentDo
 
 		public Delegate Delegate { get; private set; }
 
+		public bool RequireApproval { get; private set; }
+
 		internal JsonDocument? Schema { get; private set; }
 
-		private Tool(string name, Delegate tool, JsonDocument? schema)
+		private Tool(string name, Delegate tool, bool requireApproval, JsonDocument? schema)
 		{
 			this.Name = name;
 			this.Delegate = tool;
+			this.RequireApproval = requireApproval;
 			this.Schema = schema;
 		}
 
-		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "")
+		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = ""/*, bool requireApproval = false*/)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, null);
+			return new Tool(actualToolName, tool, /*requireApproval*/false, null);
 		}
 
 		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
@@ -36,19 +39,20 @@ namespace AgentDo
 		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "")
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, schema);
+			return new Tool(actualToolName, tool, false, schema);
 		}
 
-		public static Tool From(AIFunction aiFunction)
+		public static Tool From(AIFunction aiFunction/*, bool requireApproval = false*/)
 		{
 			return new Tool(
-				name: aiFunction.Name, 
+				name: aiFunction.Name,
 				tool: async (JsonObject i) =>
 				{
 					var arguments = i.Deserialize<Dictionary<string, object?>>();
 					var result = await aiFunction.InvokeAsync(new AIFunctionArguments(arguments));
 					return result;
-				}, 
+				},
+				requireApproval: /*requireApproval*/false,
 				schema: JsonDocument.Parse(aiFunction.JsonSchema.ToString()));
 		}
 

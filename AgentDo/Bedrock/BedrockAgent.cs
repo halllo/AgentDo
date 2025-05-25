@@ -23,9 +23,11 @@ namespace AgentDo.Bedrock
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
-			var previousMessages = task.PreviousMessages
+			//todo: detect continuation after approval and continue with approved tool call.
+			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
+			var previousMessages = promptPreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
 				.Select(m => m.Role == ConversationRole.User ? ConversationRole.User.Says(m.Text) : ConversationRole.Assistant.Says(m.Text))
 				.ToList();
@@ -38,7 +40,7 @@ namespace AgentDo.Bedrock
 				documents: documents);
 
 			var messages = previousMessages.Concat([taskMessage]).ToList();
-			var resultMessages = task.PreviousMessages.Concat([new(taskMessage.Role, taskMessage.Text())]).ToList();
+			var resultMessages = promptPreviousMessages.Concat([new(taskMessage.Role, taskMessage.Text())]).ToList();
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
 
@@ -92,14 +94,26 @@ namespace AgentDo.Bedrock
 					foreach (var toolUse in toolsUse)
 					{
 						cancellationToken.ThrowIfCancellationRequested();
-						var toolResult = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
-						toolResults.Add(toolResult);
+						var (toolResult, requiresApproval) = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
 
-						if (context.Cancelled)
+						if (toolResult == null && requiresApproval != null)
 						{
-							keepConversing = false;
-							break;
+							var agentContext = new AgentContext { Messages = resultMessages };
+							var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
+							agentContext.PendingApproval = approvalRequest;
+							return agentContext;
 						}
+						else if (toolResult != null)
+						{
+							toolResults.Add(toolResult);
+
+							if (context.Cancelled)
+							{
+								keepConversing = false;
+								break;
+							}
+						}
+						else throw new ArgumentException("No tool result and no approval requirement.");
 					}
 
 					resultMessages.Add(new Message(responseMessage.Role, text,
@@ -122,7 +136,7 @@ namespace AgentDo.Bedrock
 				}
 			}
 
-			return resultMessages;
+			return new AgentContext { Messages = resultMessages };
 		}
 
 		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonDocument schema)

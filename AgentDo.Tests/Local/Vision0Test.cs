@@ -22,7 +22,7 @@ namespace AgentDo.Tests.Local
 		public async Task LocalWithImageAndSelfConvertingSchema([FromKeyedServices("local")] OpenAILikeClient client)
 		{
 			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\Rechnung_2241198869.pdf.0.png"));
-			
+
 			OpenAILikeClient.Message[] messages =
 			[
 				new ("system", @"Answer the user's request using relevant tools. Use only the tools provided. If parameters for the tools are missing and cannot be inferred, dont call the tool."),
@@ -44,27 +44,23 @@ namespace AgentDo.Tests.Local
 			using JsonDocument functionArguments = JsonDocument.Parse(toolCall.Arguments);
 
 			Console.WriteLine(JsonSerializer.Serialize(functionArguments));
-			var invoice = functionArguments.As<Invoice>(autoDiscoverConverters: true)!;
+			var invoice = functionArguments.As<Invoice>(new DateTimeJsonConverter(), new AmountConverter())!;
 
+			//Assert.AreEqual(new DateTime(2024, 8, 20), invoice.Date);
 			Assert.AreEqual(expected: 23.13m, actual: invoice.Total.Value, delta: 0.01m);
 		}
 
-		class GermanAmounts : JsonConverter<Amount>
+		public class DateTimeJsonConverter : JsonConverter<DateTime>
 		{
-			public override Amount Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+			public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 			{
-				if (reader.TokenType == JsonTokenType.String)
-				{
-					return new Amount(decimal.Parse(reader.GetString()!, NumberStyles.Any, CultureInfo.GetCultureInfo("de")));
-				}
-				else if (reader.TokenType == JsonTokenType.Number)
-				{
-					return new Amount(reader.GetDecimal());
-				}
-				throw new JsonException();
+				return Convert.ToDateTime(reader.GetString());
 			}
 
-			public override void Write(Utf8JsonWriter writer, Amount value, JsonSerializerOptions options) => throw new NotImplementedException();
+			public override void Write(Utf8JsonWriter writer, DateTime dateTimeValue, JsonSerializerOptions options)
+			{
+				writer.WriteStringValue(dateTimeValue.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+			}
 		}
 	}
 }

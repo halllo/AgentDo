@@ -19,18 +19,19 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
+			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
 
-			var previousMessages = task.PreviousMessages
+			var previousMessages = promptPreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
 				.Select(m => new OpenAILikeClient.Message(m.Role, m.Text))
 				.ToList();
 
 			var messages = previousMessages;
-			var resultMessages = task.PreviousMessages.ToList();
+			var resultMessages = promptPreviousMessages.ToList();
 
 			var taskMessage = new OpenAILikeClient.Message("user", task.Text);
 			messages.Add(taskMessage);
@@ -67,10 +68,21 @@ namespace AgentDo.OpenAI.Like
 								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.Function.Name, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
 
-								var toolResultMessage = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
-								messages.Add(toolResultMessage);
+								var (toolResultMessage, requiresApproval) = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 
-								resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content! }]));
+								if (toolResultMessage == null && requiresApproval != null)
+								{
+									var agentContext = new AgentContext { Messages = resultMessages };
+									var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
+									agentContext.PendingApproval = approvalRequest;
+									return agentContext;
+								}
+								else if (toolResultMessage != null)
+								{
+									messages.Add(toolResultMessage);
+									resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content! }]));
+								}
+								else throw new ArgumentException("No tool result and no approval requirement.");
 							}
 							break;
 						}
@@ -83,7 +95,7 @@ namespace AgentDo.OpenAI.Like
 				}
 			}
 
-			return resultMessages;
+			return new AgentContext { Messages = resultMessages };
 		}
 
 		protected override OpenAILikeClient.Tool CreateTool(string name, string description, JsonDocument schema)

@@ -46,7 +46,7 @@ namespace AgentDo.Bedrock
 			var json = amazonJson.FromAmazonJson();
 
 			var deserializationOptions = autoDiscoverConverters
-				? JsonSchemaExtensions.DeserializationOptions.WithAutoDiscoveredConverters(typeof(T))
+				? JsonSchemaExtensions.DeserializationOptions.WithConverters(JsonSchemaExtensions.GetAutoDiscoveredConverters(typeof(T)))
 				: JsonSchemaExtensions.DeserializationOptions;
 
 			var t = JsonSerializer.Deserialize<T>(json, deserializationOptions);

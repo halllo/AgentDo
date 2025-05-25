@@ -33,7 +33,7 @@ namespace AgentDo.Tests.OpenAI
 
 			var toolCall = completion.ToolCalls[0];
 			var toolResult = await tool.UseAsOpenAITool(toolCall, ChatMessageRole.Assistant);
-
+			Assert.IsNotNull(toolResult.Item1);
 			Console.WriteLine(JsonSerializer.Serialize(registeredPerson));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);

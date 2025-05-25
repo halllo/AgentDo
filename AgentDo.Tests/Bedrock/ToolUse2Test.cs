@@ -43,7 +43,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var toolUse = responseMessage.Content[1].ToolUse;
 			var toolResult = await tool.UseAsBedrockTool(toolUse, ConversationRole.Assistant);
-
+			Assert.IsNotNull(toolResult.Item1);
 			Console.WriteLine(JsonSerializer.Serialize(registeredPerson));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);

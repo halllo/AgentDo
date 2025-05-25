@@ -21,12 +21,14 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<List<Message>> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
 
-			var previousMessages = task.PreviousMessages
+			//todo: detect continuation after approval and continue with approved tool call.
+			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
+			var previousMessages = promptPreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
 				.Select(m => m.Role == ChatMessageRole.User.ToString() ? (ChatMessage)new UserChatMessage(m.Text)
 						   : m.Role == ChatMessageRole.Assistant.ToString() ? new AssistantChatMessage(m.Text)
@@ -36,7 +38,7 @@ namespace AgentDo.OpenAI
 				.ToList();
 
 			var messages = previousMessages;
-			var resultMessages = task.PreviousMessages.ToList();
+			var resultMessages = promptPreviousMessages.ToList();
 
 			var taskMessage = new UserChatMessage(task.Text);
 			messages.Add(taskMessage);
@@ -81,19 +83,30 @@ namespace AgentDo.OpenAI
 									toolResults: null,
 									generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed }));
 
-								var toolResultMessage = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
+								var (toolResultMessage, requiresApproval) = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
 
-								if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+								if (toolResultMessage == null && requiresApproval != null)
 								{
-									messages.Add(toolResultMessage);
-									resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
+									var agentContext = new AgentContext { Messages = resultMessages };
+									var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
+									agentContext.PendingApproval = approvalRequest;
+									return agentContext;
 								}
+								else if (toolResultMessage != null)
+								{
+									if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+									{
+										messages.Add(toolResultMessage);
+										resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
+									}
 
-								if (context.Cancelled)
-								{
-									keepConversing = false;
-									break;
+									if (context.Cancelled)
+									{
+										keepConversing = false;
+										break;
+									}
 								}
+								else throw new ArgumentException("No tool result and no approval requirement.");
 							}
 							break;
 						}
@@ -110,7 +123,7 @@ namespace AgentDo.OpenAI
 				}
 			}
 
-			return resultMessages;
+			return new AgentContext { Messages = resultMessages };
 		}
 
 		protected override ChatTool CreateTool(string name, string description, JsonDocument schema)

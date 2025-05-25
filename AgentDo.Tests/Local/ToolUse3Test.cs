@@ -45,7 +45,7 @@ DO NOT ask for more information on optional parameters if it is not provided.";
 
 			Person? registeredPerson = default;
 			var messages = await agent.Do(
-				task: new Content.Prompt("I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.", [ new Message { Role = "system", Text = systemPrompt } ]),
+				task: new Content.Prompt("I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.", new AgentContext { Messages = [new Message { Role = "system", Text = systemPrompt }] }),
 				tools:
 				[
 					Tool.From(toolName: "register_person", tool: [Description("Register person.")] (Person person) =>

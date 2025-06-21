@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using static AgentDo.AgentResult;
-using static AgentDo.Message;
 
 namespace AgentDo.OpenAI
 {
@@ -27,26 +26,31 @@ namespace AgentDo.OpenAI
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
-			if (task.AgentContext?.PendingToolUses != null) throw new NotSupportedException("Continuing with pending tool use not supported yet.");
-			
+
+			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			var previousMessages = promptPreviousMessages
-				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
 				.Select(m => m.Role == ChatMessageRole.User.ToString() ? (ChatMessage)new UserChatMessage(m.Text)
-						   : m.Role == ChatMessageRole.Assistant.ToString() ? new AssistantChatMessage(m.Text)
+						   : m.Role == ChatMessageRole.Assistant.ToString() && m.ToolCalls != null && m.ToolCalls.Any() ? new AssistantChatMessage(m.ToolCalls.Select(c => ChatToolCall.CreateFunctionToolCall(c.Id, c.Name, BinaryData.FromString(c.Input))))
+						   : m.Role == ChatMessageRole.Assistant.ToString() ? new AssistantChatMessage(m.GetTextualRepresentation())
 						   : m.Role == ChatMessageRole.System.ToString() ? new SystemChatMessage(m.Text)
-						   : m.Role == ChatMessageRole.Tool.ToString() ? new UserChatMessage(m.Text)
+						   : m.Role == ChatMessageRole.Tool.ToString() ? new ToolChatMessage(m.ToolResults.Single().Id, m.ToolResults.Single().Output)
 						   : throw new ArgumentOutOfRangeException())
 				.ToList();
 
 			var messages = previousMessages;
 			var resultMessages = promptPreviousMessages.ToList();
 
-			var taskMessage = new UserChatMessage(task.Text);
-			messages.Add(taskMessage);
-			resultMessages.Add(new(ChatMessageRole.User.ToString(), taskMessage.Text(), null, null));
+			var taskMessage = pendingToolUses == null
+				? new UserChatMessage(task.Text)
+				: null;
 
-			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
+			if (taskMessage != null)
+			{
+				messages.Add(taskMessage);
+				resultMessages.Add(new(ChatMessageRole.User.ToString(), taskMessage.Text(), null, null));
+				if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
+			}
 
 			var completionOptions = new ChatCompletionOptions()
 			{
@@ -61,87 +65,134 @@ namespace AgentDo.OpenAI
 			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
-				var chatDurationStopwatch = Stopwatch.StartNew();
-				ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken);
-				chatDurationStopwatch.Stop();
-				messages.Add(new AssistantChatMessage(completion));
-
-				var text = completion.Text();
-				if (!string.IsNullOrWhiteSpace(text))
+				if (pendingToolUses != null)
 				{
-					logger.LogInformation("{Role}: {Text}", completion.Role, text);
-					context.Text = text;
-				}
+					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
+					{
+						var (toolResult, requiresApproval) = await Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
 
-				var generationData = new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed };
-
-				switch (completion.FinishReason)
-				{
-					case ChatFinishReason.ToolCalls:
+						if (toolResult == null && requiresApproval != null)
 						{
-							var pendingToolUses = new List<PendingToolUse>();
-							foreach (var toolUse in completion.ToolCalls) pendingToolUses.Add(new PendingToolUse
+							return new AgentResult
 							{
-								ToolUseId = toolUse.Id,
-								ToolName = toolUse.FunctionName,
-								ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
-								ToolResult = null,
-								Approved = true, // all tool calls are pre-approved in this implementation
-							});
-							foreach (var toolUse in pendingToolUses)
+								Agent = this,
+								Task = task,
+								Tools = tools,
+								Messages = resultMessages,
+								PendingToolUses = pendingToolUses,
+							};
+						}
+						else if (toolResult != null)
+						{
+							toolUse.ToolResult = JsonSerializer.Serialize(toolResult.Result);
+
+							if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 							{
-								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Role.ToString(), text,
-									toolCalls: [new Message.ToolCall { Name = toolUse.ToolName, Id = toolUse.ToolUseId, Input = toolUse.ToolInput.ToJsonString() }],
-									toolResults: null,
-									generationData: generationData));
-
-								var (toolResult, requiresApproval) = await Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
-
-								if (toolResult == null && requiresApproval != null)
-								{
-									return new AgentResult
-									{
-										Agent = this,
-										Task = task,
-										Tools = tools,
-										Messages = resultMessages,
-										PendingToolUses = new PendingToolUsesContext
-										{
-											Role = completion.Role.ToString(),
-											Text = text,
-											Uses = pendingToolUses,
-											GenerationData = generationData,
-										},
-									};
-								}
-								else if (toolResult != null)
-								{
-									toolUse.ToolResult = JsonSerializer.Serialize(toolResult);
-
-									if (!context.Cancelled || context.RememberToolResultWhenCancelled)
-									{
-										var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
-										messages.Add(toolResultMessage);
-										resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
-									}
-
-									if (context.Cancelled)
-									{
-										keepConversing = false;
-										break;
-									}
-								}
-								else throw new ArgumentException("No tool result and no approval requirement.");
+								var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
+								messages.Add(toolResultMessage);
+								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
 							}
-							break;
+
+							if (context.Cancelled)
+							{
+								keepConversing = false;
+								break;
+							}
 						}
-					default:
-						{
-							resultMessages.Add(new(completion.Role.ToString(), text, null, null, generationData));
-							keepConversing = false;
-							break;
-						}
+						else throw new ArgumentException("No tool result and no approval requirement.");
+					}
+
+					pendingToolUses = null; // clear pending tool uses to avoid reprocessing them
+				}
+				else
+				{
+					var chatDurationStopwatch = Stopwatch.StartNew();
+					ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken);
+					chatDurationStopwatch.Stop();
+					messages.Add(new AssistantChatMessage(completion));
+
+					var text = completion.Text();
+					if (!string.IsNullOrWhiteSpace(text))
+					{
+						logger.LogInformation("{Role}: {Text}", completion.Role, text);
+						context.Text = text;
+					}
+
+					var generationData = new Message.GenerationData
+					{
+						GeneratedAt = DateTimeOffset.UtcNow,
+						Duration = chatDurationStopwatch.Elapsed,
+						InputTokens = completion.Usage.InputTokenCount,
+						OutputTokens = completion.Usage.OutputTokenCount,
+					};
+
+					switch (completion.FinishReason)
+					{
+						case ChatFinishReason.ToolCalls:
+							{
+								var toolUses = new List<PendingToolUse>();
+								foreach (var toolUse in completion.ToolCalls) toolUses.Add(new PendingToolUse
+								{
+									ToolUseId = toolUse.Id,
+									ToolName = toolUse.FunctionName,
+									ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
+									ToolResult = null,
+								});
+								foreach (var toolUse in toolUses)
+								{
+									cancellationToken.ThrowIfCancellationRequested();
+									resultMessages.Add(new(completion.Role.ToString(), text,
+										toolCalls: [new Message.ToolCall { Name = toolUse.ToolName, Id = toolUse.ToolUseId, Input = toolUse.ToolInput.ToJsonString() }],
+										toolResults: null,
+										generationData: generationData));
+
+									var (toolResult, requiresApproval) = await Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
+
+									if (toolResult == null && requiresApproval != null)
+									{
+										return new AgentResult
+										{
+											Agent = this,
+											Task = task,
+											Tools = tools,
+											Messages = resultMessages,
+											PendingToolUses = new PendingToolUsesContext
+											{
+												Role = completion.Role.ToString(),
+												Text = text,
+												Uses = toolUses,
+												GenerationData = generationData,
+											},
+										};
+									}
+									else if (toolResult != null)
+									{
+										toolUse.ToolResult = JsonSerializer.Serialize(toolResult.Result);
+
+										if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+										{
+											var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
+											messages.Add(toolResultMessage);
+											resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
+										}
+
+										if (context.Cancelled)
+										{
+											keepConversing = false;
+											break;
+										}
+									}
+									else throw new ArgumentException("No tool result and no approval requirement.");
+								}
+								break;
+							}
+						default:
+							{
+								resultMessages.Add(new(completion.Role.ToString(), text, null, null, generationData));
+								keepConversing = false;
+								break;
+							}
+					}
 				}
 			}
 

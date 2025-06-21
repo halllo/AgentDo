@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using static AgentDo.AgentResult;
 
 namespace AgentDo
 {
@@ -86,22 +87,11 @@ namespace AgentDo
 			return result;
 		}
 
-		public class ApprovalRequired
-		{
-			public string ToolName { get; } = null!;
-			public string? ToolId { get; }
-			public JsonObject? Inputs { get; }
-
-			internal ApprovalRequired(string name, string? id, JsonObject? inputs)
-			{
-				this.ToolName = name;
-				this.ToolId = id;
-				this.Inputs = inputs;
-			}
-		}
+		public record ToolResult(object? Result);
+		public record ApprovalRequired();
 	}
 
-	public abstract class ToolUsing<TTool, TToolUse, TToolResult> : ToolUsing where TToolResult : class
+	public abstract class ToolUsing<TTool> : ToolUsing
 	{
 		public TTool GetToolDefinition(Tool tool)
 		{
@@ -121,9 +111,9 @@ namespace AgentDo
 
 		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
 
-		internal async Task<(TToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
+		internal async Task<(ToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, PendingToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
 		{
-			var requestedToolName = GetToolName(toolUse).name;
+			var requestedToolName = toolUse.ToolName;
 			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
 			if (toolToUse == null)
 			{
@@ -131,7 +121,7 @@ namespace AgentDo
 
 				if (ignoreUnknownTools)
 				{
-					return (GetAsToolResult(toolUse, "Unknown tool. Dont call again!"), null);
+					return (new ToolResult("Unknown tool. Dont call again!"), null);
 				}
 				else
 				{
@@ -144,16 +134,17 @@ namespace AgentDo
 			}
 		}
 
-		public async Task<(TToolResult?, ApprovalRequired?)> Use(Tool tool, TToolUse toolUse, object role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
+		public async Task<(ToolResult?, ApprovalRequired?)> Use(Tool tool, PendingToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
 		{
-			var (name, id) = GetToolName(toolUse);
-			var inputs = GetToolInputs(toolUse);
+			var name = toolUse.ToolName;
+			var id = toolUse.ToolUseId;
+			var inputs = toolUse.ToolInput;
 			var logItsAndOutputs = tool.LogInputsAndOutputs;
 
-			if (tool.RequireApproval)
+			if (tool.RequireApproval && !toolUse.Approved)
 			{
 				logger?.LogInformation("{Tool}: Tool {ToolUse} requires approval to invoke.", id, name);
-				return (null, new ApprovalRequired(name, id, inputs));
+				return (null, new ApprovalRequired());
 			}
 
 			try
@@ -178,17 +169,13 @@ namespace AgentDo
 				{
 					logger?.LogInformation("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
 				}
-				return (GetAsToolResult(toolUse, result), null);
+				return (new ToolResult(result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)
 			{
 				logger?.LogError(invalidSchema, "{Role}: Invoking {ToolUse}(@Input) failed because invalid schema.", role, name, inputs);
-				return (GetAsToolResult(toolUse, "failed"), null);
+				return (new ToolResult("failed"), null);
 			}
 		}
-
-		protected abstract (string name, string id) GetToolName(TToolUse toolUse);
-		protected abstract JsonObject GetToolInputs(TToolUse toolUse);
-		protected abstract TToolResult GetAsToolResult(TToolUse toolUse, object? result);
 	}
 }

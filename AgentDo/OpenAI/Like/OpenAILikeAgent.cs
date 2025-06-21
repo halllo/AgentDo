@@ -3,10 +3,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using static AgentDo.AgentResult;
+using static AgentDo.Message;
 
 namespace AgentDo.OpenAI.Like
 {
-	public class OpenAILikeAgent : ToolUsing<OpenAILikeClient.Tool, OpenAILikeClient.ToolCall, OpenAILikeClient.Message>, IAgent
+	public class OpenAILikeAgent : ToolUsing<OpenAILikeClient.Tool>, IAgent
 	{
 		private readonly OpenAILikeClient client;
 		private readonly ILogger<OpenAILikeAgent> logger;
@@ -19,12 +21,13 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
-			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
+			if (task.AgentContext?.PendingToolUses != null) throw new NotSupportedException("Continuing with pending tool use not supported yet.");
 
+			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			var previousMessages = promptPreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
 				.Select(m => new OpenAILikeClient.Message(m.Role, m.Text))
@@ -63,24 +66,44 @@ namespace AgentDo.OpenAI.Like
 				{
 					case "tool_calls":
 						{
-							foreach (var toolCall in completion.Message.ToolCalls ?? [])
+							var pendingToolUses = new List<PendingToolUse>();
+							foreach (var toolUse in completion.Message.ToolCalls ?? []) pendingToolUses.Add(new PendingToolUse
+							{
+								ToolUseId = toolUse.Id,
+								ToolName = toolUse.Function.Name,
+								ToolInput = JsonDocument.Parse(toolUse.Function.Arguments).As<JsonObject>()!,
+								ToolResult = null,
+								Approved = true, // all tool calls are pre-approved in this implementation
+							});
+							foreach (var toolCall in pendingToolUses)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.Function.Name, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
+								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput.ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
 
-								var (toolResultMessage, requiresApproval) = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
+								var (toolResult, requiresApproval) = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 
-								if (toolResultMessage == null && requiresApproval != null)
+								if (toolResult == null && requiresApproval != null)
 								{
-									var agentContext = new AgentContext { Messages = resultMessages };
-									var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
-									agentContext.PendingApproval = approvalRequest;
-									return agentContext;
+									return new AgentResult
+									{
+										Agent = this,
+										Task = task,
+										Tools = tools,
+										Messages = resultMessages,
+										PendingToolUses = new PendingToolUsesContext
+										{
+											Role = completion.Message.Role.ToString(),
+											Text = text,
+											Uses = pendingToolUses,
+											GenerationData = null,
+										},
+									};
 								}
-								else if (toolResultMessage != null)
+								else if (toolResult != null)
 								{
+									var toolResultMessage = GetAsToolResultMessage(toolCall.ToolUseId, toolResult);
 									messages.Add(toolResultMessage);
-									resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content! }]));
+									resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.ToolUseId, Output = toolResultMessage.Content! }]));
 								}
 								else throw new ArgumentException("No tool result and no approval requirement.");
 							}
@@ -95,7 +118,7 @@ namespace AgentDo.OpenAI.Like
 				}
 			}
 
-			return new AgentContext { Messages = resultMessages };
+			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
 		protected override OpenAILikeClient.Tool CreateTool(string name, string description, JsonDocument schema)
@@ -103,22 +126,12 @@ namespace AgentDo.OpenAI.Like
 			return new(name, description, schema);
 		}
 
-		protected override (string name, string id) GetToolName(OpenAILikeClient.ToolCall toolUse)
-		{
-			return (toolUse.Function.Name, toolUse.Id);
-		}
-
-		protected override JsonObject GetToolInputs(OpenAILikeClient.ToolCall toolUse)
-		{
-			return JsonDocument.Parse(toolUse.Function.Arguments).As<JsonObject>()!;
-		}
-
-		protected override OpenAILikeClient.Message GetAsToolResult(OpenAILikeClient.ToolCall toolUse, object? result)
+		private OpenAILikeClient.Message GetAsToolResultMessage(string toolUseId, ToolUsing.ToolResult result)
 		{
 			return new OpenAILikeClient.Message(
 				Role: "tool",
-				Content: JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions),
-				ToolCallId: toolUse.Id);
+				Content: JsonSerializer.Serialize(result.Result, JsonSchemaExtensions.OutputOptions),
+				ToolCallId: toolUseId);
 		}
 	}
 }

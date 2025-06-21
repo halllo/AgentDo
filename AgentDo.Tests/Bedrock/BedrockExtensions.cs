@@ -1,8 +1,7 @@
 ﻿using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System.Text.Json.Nodes;
 
 namespace AgentDo.Tests.Bedrock
 {
@@ -15,7 +14,14 @@ namespace AgentDo.Tests.Bedrock
 
 		public static async Task<(ToolResultBlock?, ToolUsing.ApprovalRequired?)> UseAsBedrockTool(this Tool tool, ToolUseBlock toolUse, ConversationRole role)
 		{
-			return await new BedrockAgent(null!, null!, null!).Use(tool, toolUse, role, null!, null);
+			var pendingToolUse = new AgentResult.PendingToolUse
+			{
+				ToolUseId = toolUse.ToolUseId,
+				ToolName = toolUse.Name,
+				ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
+			};
+			var result = await new BedrockAgent(null!, null!, null!).Use(tool, pendingToolUse, role, null!, null);
+			return (BedrockAgent.GetAsToolResultMessage(toolUse.ToolUseId, result.Item1?.Result), result.Item2);
 		}
 
 		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = "anthropic.claude-3-sonnet-20240229-v1:0")
@@ -34,18 +40,6 @@ namespace AgentDo.Tests.Bedrock
 			});
 
 			return response;
-		}
-
-		public static IAgent AsAgent(this IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
-		{
-			return new BedrockAgent(
-				bedrock: bedrock,
-				logger: loggerFactory.CreateLogger<BedrockAgent>(),
-				options: Options.Create(new BedrockAgentOptions
-				{
-					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
-					Temperature = 0.0F
-				}));
 		}
 	}
 }

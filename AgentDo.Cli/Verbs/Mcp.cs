@@ -23,7 +23,7 @@ namespace AgentDo.Cli.Verbs
 				return new { status = "registered" };
 			});
 
-			var messages = await agent.Do(
+			await agent.Do(
 				task: Task,
 				tools:
 				[

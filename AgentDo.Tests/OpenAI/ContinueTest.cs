@@ -22,7 +22,7 @@ namespace AgentDo.Tests.OpenAI
 				}));
 
 			var registeredName = default(string?);
-			var registerMessages = await agent.Do(
+			var registerResult = await agent.Do(
 				task: "I would like to register Manuel Naujoks.",
 				tools:
 				[
@@ -33,12 +33,12 @@ namespace AgentDo.Tests.OpenAI
 					}),
 				]);
 
-			Console.WriteLine("Register messages:\n" + JsonSerializer.Serialize(registerMessages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine("Register messages:\n" + JsonSerializer.Serialize(registerResult.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.AreEqual("Manuel Naujoks", registeredName);
 
 			var unregisteredName = default(string?);
-			var unregisterMessages = await agent.Do(
-				task: new Content.Prompt("I would like to cancel the registration.", registerMessages),
+			var unregisterResult = await agent.Do(
+				task: new Content.Prompt("I would like to cancel the registration.", registerResult),
 				tools:
 				[
 					Tool.From([Description("Unregister person.")] (string name, Tool.Context context) =>
@@ -48,7 +48,7 @@ namespace AgentDo.Tests.OpenAI
 					}),
 				]);
 
-			Console.WriteLine("Unregister messages:\n" + JsonSerializer.Serialize(unregisterMessages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine("Unregister messages:\n" + JsonSerializer.Serialize(unregisterResult.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.AreEqual("Manuel Naujoks", unregisteredName);
 		}
 	}

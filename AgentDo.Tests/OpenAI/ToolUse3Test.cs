@@ -37,7 +37,7 @@ namespace AgentDo.Tests.OpenAI
 				}));
 
 			Person? registeredPerson = default;
-			var messages = await agent.Do(
+			var result = await agent.Do(
 				task: "I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.",
 				tools:
 				[
@@ -50,7 +50,7 @@ namespace AgentDo.Tests.OpenAI
 					Tool.From([Description("Get today.")]() => "01 March 2025"),
 				]);
 
-			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
 			Assert.AreEqual(38, registeredPerson.Age);

@@ -8,7 +8,10 @@ namespace AgentDo.Bedrock
 	{
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ContentBlock content) => new() { Role = role, Content = [content] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [.. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [.. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text) => Says(role, text, [], []);
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ImageBlock> images) => Says(role, text, images, []);
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<DocumentBlock> documents) => Says(role, text, [], documents);

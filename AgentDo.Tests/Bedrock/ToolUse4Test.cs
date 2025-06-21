@@ -8,25 +8,13 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 namespace AgentDo.Tests.Bedrock
 {
 	[TestClass]
-	public sealed class ToolUse3Test
+	public sealed class ToolUse4Test
 	{
-		record Person(
-			[property: Description("The full name of the person.")]
-			string Name,
-
-			[property: Description("""
-			The age of the person at the current day.
-			If it needs calculation, pay close attention if the birthday of the current year has already occured or not.
-			""")]
-			int Age,
-
-			[property: Description("Where the person lives.")]
-			Address? Address = null);
-
+		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
-		public async Task BedrockAgentMultiToolUse(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		public async Task BedrockAgentMultiToolUseWIthApproval(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var agent = new BedrockAgent(
 				bedrock: bedrock,
@@ -46,10 +34,19 @@ namespace AgentDo.Tests.Bedrock
 					{
 						registeredPerson = person;
 						return "registered";
-					}),
+					}, requireApproval: true),
 
 					Tool.From([Description("Get today.")]() => "01 March 2025"),
 				]);
+
+			if (result.NeedsApprovalToContinue)
+			{
+				result = await result.ApproveAndContinue();
+			}
+			else
+			{
+				Assert.Fail("Expected pending approval for tool use, but none was found.");
+			}
 
 			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);

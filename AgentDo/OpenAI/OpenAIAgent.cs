@@ -5,10 +5,12 @@ using OpenAI.Chat;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using static AgentDo.AgentResult;
+using static AgentDo.Message;
 
 namespace AgentDo.OpenAI
 {
-	public class OpenAIAgent : ToolUsing<ChatTool, ChatToolCall, ToolChatMessage>, IAgent
+	public class OpenAIAgent : ToolUsing<ChatTool>, IAgent
 	{
 		private readonly ChatClient client;
 		private readonly ILogger<OpenAIAgent> logger;
@@ -21,12 +23,12 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
-
-			//todo: detect continuation after approval and continue with approved tool call.
+			if (task.AgentContext?.PendingToolUses != null) throw new NotSupportedException("Continuing with pending tool use not supported yet.");
+			
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			var previousMessages = promptPreviousMessages
 				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
@@ -71,33 +73,57 @@ namespace AgentDo.OpenAI
 					context.Text = text;
 				}
 
+				var generationData = new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed };
+
 				switch (completion.FinishReason)
 				{
 					case ChatFinishReason.ToolCalls:
 						{
-							foreach (var toolCall in completion.ToolCalls)
+							var pendingToolUses = new List<PendingToolUse>();
+							foreach (var toolUse in completion.ToolCalls) pendingToolUses.Add(new PendingToolUse
+							{
+								ToolUseId = toolUse.Id,
+								ToolName = toolUse.FunctionName,
+								ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
+								ToolResult = null,
+								Approved = true, // all tool calls are pre-approved in this implementation
+							});
+							foreach (var toolUse in pendingToolUses)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Role.ToString(), text,
-									toolCalls: [new Message.ToolCall { Name = toolCall.FunctionName, Id = toolCall.Id, Input = GetToolInputs(toolCall).ToJsonString(JsonSchemaExtensions.OutputOptions) }],
+									toolCalls: [new Message.ToolCall { Name = toolUse.ToolName, Id = toolUse.ToolUseId, Input = toolUse.ToolInput.ToJsonString() }],
 									toolResults: null,
-									generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = chatDurationStopwatch.Elapsed }));
+									generationData: generationData));
 
-								var (toolResultMessage, requiresApproval) = await Use(tools, toolCall, completion.Role, context, logger, cancellationToken: cancellationToken);
+								var (toolResult, requiresApproval) = await Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
 
-								if (toolResultMessage == null && requiresApproval != null)
+								if (toolResult == null && requiresApproval != null)
 								{
-									var agentContext = new AgentContext { Messages = resultMessages };
-									var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
-									agentContext.PendingApproval = approvalRequest;
-									return agentContext;
+									return new AgentResult
+									{
+										Agent = this,
+										Task = task,
+										Tools = tools,
+										Messages = resultMessages,
+										PendingToolUses = new PendingToolUsesContext
+										{
+											Role = completion.Role.ToString(),
+											Text = text,
+											Uses = pendingToolUses,
+											GenerationData = generationData,
+										},
+									};
 								}
-								else if (toolResultMessage != null)
+								else if (toolResult != null)
 								{
+									toolUse.ToolResult = JsonSerializer.Serialize(toolResult);
+
 									if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 									{
+										var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
 										messages.Add(toolResultMessage);
-										resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolCall.Id, Output = toolResultMessage.Content[0].Text }]));
+										resultMessages.Add(new(ChatMessageRole.Tool.ToString(), text, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
 									}
 
 									if (context.Cancelled)
@@ -112,18 +138,14 @@ namespace AgentDo.OpenAI
 						}
 					default:
 						{
-							resultMessages.Add(new(completion.Role.ToString(), text, null, null, new Message.GenerationData
-							{
-								GeneratedAt = DateTimeOffset.UtcNow,
-								Duration = chatDurationStopwatch.Elapsed,
-							}));
+							resultMessages.Add(new(completion.Role.ToString(), text, null, null, generationData));
 							keepConversing = false;
 							break;
 						}
 				}
 			}
 
-			return new AgentContext { Messages = resultMessages };
+			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
 		protected override ChatTool CreateTool(string name, string description, JsonDocument schema)
@@ -135,19 +157,9 @@ namespace AgentDo.OpenAI
 			);
 		}
 
-		protected override (string name, string id) GetToolName(ChatToolCall toolUse)
+		public static ToolChatMessage GetAsToolResultMessage(string toolUseId, object? result)
 		{
-			return (toolUse.FunctionName, toolUse.Id);
-		}
-
-		protected override JsonObject GetToolInputs(ChatToolCall toolUse)
-		{
-			return JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!;
-		}
-
-		protected override ToolChatMessage GetAsToolResult(ChatToolCall toolUse, object? result)
-		{
-			return new ToolChatMessage(toolUse.Id, JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions));
+			return new ToolChatMessage(toolUseId, JsonSerializer.Serialize(result, JsonSchemaExtensions.OutputOptions));
 		}
 	}
 }

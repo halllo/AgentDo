@@ -7,7 +7,7 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.OpenAI
 {
-	[TestClass, Ignore]
+	[TestClass]
 	public sealed class ToolUse4Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
@@ -25,7 +25,7 @@ namespace AgentDo.Tests.OpenAI
 				}));
 
 			Person? registeredPerson = default;
-			var (messages, pendingApproval) = await agent.Do(
+			var result = await agent.Do(
 				task: "I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.",
 				tools:
 				[
@@ -33,24 +33,21 @@ namespace AgentDo.Tests.OpenAI
 					{
 						registeredPerson = person;
 						return "registered";
-					}/*, requireApproval: true*/),
+					}, requireApproval: true),
 
 					Tool.From([Description("Get today.")]() => "01 March 2025"),
 				]);
 
-			if (pendingApproval != null)
+			if (result.NeedsApprovalToContinue)
 			{
-				Console.WriteLine("Pending approval for tool use:");
-				Console.WriteLine(JsonSerializer.Serialize(pendingApproval, new JsonSerializerOptions { WriteIndented = true }));
-
-				await pendingApproval.ApproveAndContinue();
+				result = await result.ApproveAndContinue();
 			}
 			else
 			{
 				Assert.Fail("Expected pending approval for tool use, but none was found.");
 			}
 
-			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
 			Assert.AreEqual(38, registeredPerson.Age);

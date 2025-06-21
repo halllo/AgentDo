@@ -44,8 +44,8 @@ DO NOT ask for more information on optional parameters if it is not provided.";
 //Before calling a tool, do some analysis within <thinking></thinking> tags.
 
 			Person? registeredPerson = default;
-			var messages = await agent.Do(
-				task: new Content.Prompt("I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.", new AgentContext { Messages = [new Message { Role = "system", Text = systemPrompt }] }),
+			var result = await agent.Do(
+				task: new Content.Prompt("I would like to register Manuel Naujoks (born on September 7th in 1986) from Karlsruhe.", new AgentResult { Messages = [new Message { Role = "system", Text = systemPrompt }] }),
 				tools:
 				[
 					Tool.From(toolName: "register_person", tool: [Description("Register person.")] (Person person) =>
@@ -59,7 +59,7 @@ DO NOT ask for more information on optional parameters if it is not provided.";
 					Tool.From(toolName: "calculate_age", tool: [Description("Calculate age.")](DateTime birthday) => (DateTime.Today - birthday).TotalDays / 365),
 				]);
 
-			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
 			Assert.AreEqual(38, registeredPerson.Age);

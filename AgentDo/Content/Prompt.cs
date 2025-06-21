@@ -17,7 +17,7 @@ DO NOT ask for more information on optional parameters if it is not provided.
 		public string Text { get; }
 		public List<Image> Images { get; }
 		public List<Document> Documents { get; }
-		public AgentContext? AgentContext { get; }
+		public AgentResult? AgentContext { get; }
 
 		public Prompt(string text) : this(text, [], [], null)
 		{
@@ -31,11 +31,11 @@ DO NOT ask for more information on optional parameters if it is not provided.
 		{
 		}
 
-		public Prompt(string text, AgentContext? agentContext) : this(text, [], [], agentContext)
+		public Prompt(string text, AgentResult? agentContext) : this(text, [], [], agentContext)
 		{
 		}
 
-		public Prompt(string text, IEnumerable<Image> images, IEnumerable<Document> documents, AgentContext? agentContext)
+		public Prompt(string text, IEnumerable<Image> images, IEnumerable<Document> documents, AgentResult? agentContext)
 		{
 			Text = text;
 			Images = [.. images];

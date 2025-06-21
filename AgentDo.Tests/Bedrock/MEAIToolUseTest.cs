@@ -33,14 +33,14 @@ namespace AgentDo.Tests.Bedrock
 				return "registered";
 			});
 
-			var messages = await agent.Do(
+			var result = await agent.Do(
 				task: "I would like to register Manuel Naujoks from Karlsruhe.",
 				tools:
 				[
 					Tool.From(aiFunction),
 				]);
 
-			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
 			Assert.IsNotNull(registeredPerson.Address);
@@ -67,14 +67,14 @@ namespace AgentDo.Tests.Bedrock
 				registeredPerson = person;
 			});
 
-			var messages = await agent.Do(
+			var result = await agent.Do(
 				task: "I would like to register Manuel Naujoks from Karlsruhe.",
 				tools:
 				[
 					Tool.From(aiFunction),
 				]);
 
-			Console.WriteLine(JsonSerializer.Serialize(messages, new JsonSerializerOptions { WriteIndented = true }));
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.IsNotNull(registeredPerson);
 			Assert.AreEqual("Manuel Naujoks", registeredPerson.Name);
 			Assert.IsNotNull(registeredPerson.Address);

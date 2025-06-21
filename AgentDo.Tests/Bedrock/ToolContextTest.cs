@@ -1,4 +1,5 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 

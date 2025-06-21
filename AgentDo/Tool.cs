@@ -29,10 +29,10 @@ namespace AgentDo
 			this.Schema = schema;
 		}
 
-		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "", bool logInputsAndOutputs = true/*, bool requireApproval = false*/)
+		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "", bool logInputsAndOutputs = true, bool requireApproval = false)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, logInputsAndOutputs, /*requireApproval*/false, null);
+			return new Tool(actualToolName, tool, logInputsAndOutputs, requireApproval, null);
 		}
 
 		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
@@ -45,7 +45,7 @@ namespace AgentDo
 			return new Tool(actualToolName, tool, logInputsAndOutputs, false, schema);
 		}
 
-		public static Tool From(AIFunction aiFunction, bool logInputsAndOutputs = true/*, bool requireApproval = false*/)
+		public static Tool From(AIFunction aiFunction, bool logInputsAndOutputs = true, bool requireApproval = false)
 		{
 			return new Tool(
 				name: aiFunction.Name,
@@ -56,7 +56,7 @@ namespace AgentDo
 					return result;
 				},
 				logInputsAndOutputs: logInputsAndOutputs,
-				requireApproval: /*requireApproval*/false,
+				requireApproval: requireApproval,
 				schema: JsonDocument.Parse(aiFunction.JsonSchema.ToString()));
 		}
 

@@ -1,4 +1,5 @@
-﻿using Amazon.BedrockRuntime;
+﻿using AgentDo.Bedrock;
+using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 
 namespace AgentDo.Tests.Bedrock
@@ -12,7 +13,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -33,7 +34,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -53,7 +54,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -73,7 +74,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -94,7 +95,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -114,7 +115,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[
@@ -134,7 +135,7 @@ namespace AgentDo.Tests.Bedrock
 			var fCalls = new List<string>();
 
 			var agent = bedrock.AsAgent(loggerFactory);
-			var messages = await agent.Do(
+			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
 				[

@@ -7,10 +7,11 @@ using System.Collections;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using static AgentDo.AgentResult;
 
 namespace AgentDo.Bedrock
 {
-	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool, ToolUseBlock, ToolResultBlock>, IAgent
+	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool>, IAgent
 	{
 		private readonly IAmazonBedrockRuntime bedrock;
 		private readonly ILogger<BedrockAgent> logger;
@@ -23,26 +24,34 @@ namespace AgentDo.Bedrock
 			this.options = options;
 		}
 
-		public async Task<AgentContext> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
 		{
-			//todo: detect continuation after approval and continue with approved tool call.
+			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
 			var previousMessages = promptPreviousMessages
-				.Select(m => new { m.Role, Text = m.GetTextualRepresentation() })
-				.Select(m => m.Role == ConversationRole.User ? ConversationRole.User.Says(m.Text) : ConversationRole.Assistant.Says(m.Text))
+				.Select(m => new { m, Role = m.Role == ConversationRole.User.Value ? ConversationRole.User : ConversationRole.Assistant, })
+				.Select(m => m.m switch
+				{
+					{ ToolCalls: not null } => m.Role.Says(m.m.Text, m.m.ToolCalls.Select(c => new ToolUseBlock { ToolUseId = c.Id, Name = c.Name, Input = c.Input.ToAmazonJson() })),
+					{ ToolResults: not null } => m.Role.Says(m.m.ToolResults.Select(r => GetAsToolResultMessage(r.Id, r.Output.ToAmazonJson()))),
+					_ => m.Role.Says(m.m.GetTextualRepresentation()),
+				})
 				.ToList();
 
 			var images = task.Images.Select(i => i.ForBedrock()).ToList();
 			var documents = task.Documents.Select(d => d.ForBedrock()).ToList();
-			var taskMessage = ConversationRole.User.Says(
-				text: task.Text,
-				images: images,
-				documents: documents);
 
-			var messages = previousMessages.Concat([taskMessage]).ToList();
-			var resultMessages = promptPreviousMessages.Concat([new(taskMessage.Role, taskMessage.Text())]).ToList();
+			var taskMessage = pendingToolUses == null
+				? ConversationRole.User.Says(
+					text: task.Text,
+					images: images,
+					documents: documents)
+				: null;
 
-			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+			if (taskMessage != null && options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+
+			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
+			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text())] : []).ToList();
 
 			var toolConfig = new ToolConfiguration()
 			{
@@ -58,54 +67,34 @@ namespace AgentDo.Bedrock
 			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
-				var converseDurationStopwatch = Stopwatch.StartNew();
-				var response = await bedrock.ConverseAsync(new ConverseRequest
+				if (pendingToolUses != null)
 				{
-					ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
-					Messages = messages,
-					ToolConfig = toolConfig,
-					InferenceConfig = inferenceConfig,
-				}, cancellationToken);
-
-				//rewind streams in case we want to send them again
-				foreach (var stream in Enumerable
-					.Concat(images.Select(i => i.Source.Bytes), documents.Select(d => d.Source.Bytes))
-					.Where(s => s.CanSeek))
-				{
-					stream.Seek(0, SeekOrigin.Begin);
-				}
-
-				converseDurationStopwatch.Stop();
-
-				var responseMessage = response.Output.Message;
-				messages.Add(responseMessage);
-
-				var text = responseMessage.Text();
-				if (!string.IsNullOrWhiteSpace(text))
-				{
-					logger.LogInformation("{Role}: {Text}", responseMessage.Role, text);
-					context.Text = text;
-				}
-
-				if (response.StopReason == StopReason.Tool_use)
-				{
-					var toolsUse = responseMessage.ToolsUse();
 					var toolResults = new List<ToolResultBlock>();
-					foreach (var toolUse in toolsUse)
+					foreach (var toolUse in pendingToolUses.Uses.TakeWhile(t => t.ToolResult != null))
 					{
-						cancellationToken.ThrowIfCancellationRequested();
-						var (toolResult, requiresApproval) = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
+						toolResults.Add(JsonSerializer.Deserialize<ToolResultBlock>(toolUse.ToolResult!)!);
+					}
+					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
+					{
+						var (toolResult, requiresApproval) = await Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
 
 						if (toolResult == null && requiresApproval != null)
 						{
-							var agentContext = new AgentContext { Messages = resultMessages };
-							var approvalRequest = new ApprovalRequest(requiresApproval, this, task, tools, agentContext);
-							agentContext.PendingApproval = approvalRequest;
-							return agentContext;
+							return new AgentResult
+							{
+								Agent = this,
+								Task = task,
+								Tools = tools,
+								Messages = resultMessages,
+								PendingToolUses = pendingToolUses,
+							};
 						}
 						else if (toolResult != null)
 						{
-							toolResults.Add(toolResult);
+							toolUse.ToolResult = JsonSerializer.Serialize(toolResult.Result);
+
+							var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
+							toolResults.Add(toolResultMessage);
 
 							if (context.Cancelled)
 							{
@@ -116,27 +105,117 @@ namespace AgentDo.Bedrock
 						else throw new ArgumentException("No tool result and no approval requirement.");
 					}
 
-					resultMessages.Add(new Message(responseMessage.Role, text,
-						toolCalls: [.. toolsUse.Select(t => new Message.ToolCall { Name = t.Name, Id = t.ToolUseId, Input = t.Input.FromAmazonJson() })],
-						toolResults: null,
-						generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens }));
-
 					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
 						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
+					pendingToolUses = null; // clear pending tool uses to avoid reprocessing them
 				}
 				else
 				{
-					keepConversing = false;
-					resultMessages.Add(new Message(responseMessage.Role, text,
-						null, null,
-						new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens }));
+					var converseDurationStopwatch = Stopwatch.StartNew();
+					var response = await bedrock.ConverseAsync(new ConverseRequest
+					{
+						ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+						Messages = messages,
+						ToolConfig = toolConfig,
+						InferenceConfig = inferenceConfig,
+					}, cancellationToken);
+
+					//rewind streams in case we want to send them again
+					foreach (var stream in Enumerable
+						.Concat(images.Select(i => i.Source.Bytes), documents.Select(d => d.Source.Bytes))
+						.Where(s => s.CanSeek))
+					{
+						stream.Seek(0, SeekOrigin.Begin);
+					}
+
+					converseDurationStopwatch.Stop();
+
+					var responseMessage = response.Output.Message;
+					messages.Add(responseMessage);
+
+					var text = responseMessage.Text();
+					if (!string.IsNullOrWhiteSpace(text))
+					{
+						logger.LogInformation("{Role}: {Text}", responseMessage.Role, text);
+						context.Text = text;
+					}
+
+					var generationData = new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens };
+
+					if (response.StopReason == StopReason.Tool_use)
+					{
+						var toolsUse = responseMessage.ToolsUse();
+						var toolResults = new List<ToolResultBlock>();
+						var toolUses = new List<PendingToolUse>();
+						foreach (var toolUse in toolsUse) toolUses.Add(new PendingToolUse
+						{
+							ToolUseId = toolUse.ToolUseId,
+							ToolName = toolUse.Name,
+							ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
+							ToolResult = null,
+						});
+
+						resultMessages.Add(new Message(responseMessage.Role, text,
+							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput.ToJsonString() })],
+							toolResults: null,
+							generationData: generationData));
+
+						foreach (var toolUse in toolUses)
+						{
+							cancellationToken.ThrowIfCancellationRequested();
+							var (toolResult, requiresApproval) = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
+
+							if (toolResult == null && requiresApproval != null)
+							{
+								return new AgentResult
+								{
+									Agent = this,
+									Task = task,
+									Tools = tools,
+									Messages = resultMessages,
+									PendingToolUses = new PendingToolUsesContext
+									{
+										Role = responseMessage.Role,
+										Text = text,
+										Uses = toolUses,
+										GenerationData = generationData,
+									},
+								};
+							}
+							else if (toolResult != null)
+							{
+								toolUse.ToolResult = JsonSerializer.Serialize(toolResult.Result);
+
+								var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
+								toolResults.Add(toolResultMessage);
+
+								if (context.Cancelled)
+								{
+									keepConversing = false;
+									break;
+								}
+							}
+							else throw new ArgumentException("No tool result and no approval requirement.");
+						}
+
+						if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+						{
+							messages.Add(ConversationRole.User.Says(toolResults));
+							resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
+						}
+					}
+					else
+					{
+						keepConversing = false;
+						resultMessages.Add(new Message(responseMessage.Role, text, null, null, generationData));
+					}
 				}
 			}
 
-			return new AgentContext { Messages = resultMessages };
+			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
 		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonDocument schema)
@@ -155,50 +234,45 @@ namespace AgentDo.Bedrock
 			};
 		}
 
-		protected override (string name, string id) GetToolName(ToolUseBlock toolUse)
-		{
-			return (toolUse.Name, toolUse.ToolUseId);
-		}
-
-		protected override JsonObject GetToolInputs(ToolUseBlock toolUse)
-		{
-			return toolUse.Input.FromAmazonJson<JsonObject>()!;
-		}
-
-		protected override ToolResultBlock GetAsToolResult(ToolUseBlock toolUse, object? result)
+		private static ToolResultBlock GetAsToolResultMessage(string toolUseId, Amazon.Runtime.Documents.Document result)
 		{
 			return new ToolResultBlock
 			{
-				ToolUseId = toolUse.ToolUseId,
+				ToolUseId = toolUseId,
 				Content =
 				[
 					new ToolResultContentBlock
 					{
-						Json = result switch
-						{
-							JsonElement { ValueKind: JsonValueKind.Array } j => j.ToString().ToAmazonJson(),
-							JsonElement { ValueKind: JsonValueKind.Object } j => j.ToString().ToAmazonJson(),
-							_ => Amazon.Runtime.Documents.Document.FromObject(result switch
-							{
-								null => new { },
-								bool b => new { result = b },
-								int i => new { result = i },
-								long l => new { result = l },
-								double d => new { result = d },
-								string s => new { result = s },
-								Array a => new { result = a },
-								IList c => new { result = c },
-								JsonElement { ValueKind: JsonValueKind.Null } j => new { },
-								JsonElement { ValueKind: JsonValueKind.True } j => new { result = j.GetBoolean() },
-								JsonElement { ValueKind: JsonValueKind.False } j => new { result = j.GetBoolean() },
-								JsonElement { ValueKind: JsonValueKind.Number } j => new { result = j.GetDouble() },
-								JsonElement { ValueKind: JsonValueKind.String } j => new { result = j.GetString() },
-								_ => result,
-							}),
-						}
+						Json = result
 					}
 				]
 			};
+		}
+
+		public static ToolResultBlock GetAsToolResultMessage(string toolUseId, object? result)
+		{
+			return GetAsToolResultMessage(toolUseId, result switch
+			{
+				JsonElement { ValueKind: JsonValueKind.Array } j => j.ToString().ToAmazonJson(),
+				JsonElement { ValueKind: JsonValueKind.Object } j => j.ToString().ToAmazonJson(),
+				_ => Amazon.Runtime.Documents.Document.FromObject(result switch
+				{
+					null => new { },
+					bool b => new { result = b },
+					int i => new { result = i },
+					long l => new { result = l },
+					double d => new { result = d },
+					string s => new { result = s },
+					Array a => new { result = a },
+					IList c => new { result = c },
+					JsonElement { ValueKind: JsonValueKind.Null } j => new { },
+					JsonElement { ValueKind: JsonValueKind.True } j => new { result = j.GetBoolean() },
+					JsonElement { ValueKind: JsonValueKind.False } j => new { result = j.GetBoolean() },
+					JsonElement { ValueKind: JsonValueKind.Number } j => new { result = j.GetDouble() },
+					JsonElement { ValueKind: JsonValueKind.String } j => new { result = j.GetString() },
+					_ => result,
+				}),
+			});
 		}
 	}
 }

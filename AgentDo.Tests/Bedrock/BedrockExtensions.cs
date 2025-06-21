@@ -7,20 +7,20 @@ namespace AgentDo.Tests.Bedrock
 {
 	public static class BedrockExtensions
 	{
-		public static Amazon.BedrockRuntime.Model.Tool AsBedrockTool(this Tool tool)
+		public static Amazon.BedrockRuntime.Model.Tool ForBedrock(this Tool tool)
 		{
-			return new BedrockAgent(null!, null!, null!).GetToolDefinition(tool);
+			return BedrockAgent.CreateTool(tool);
 		}
 
 		public static async Task<(ToolResultBlock?, ToolUsing.ApprovalRequired?)> UseAsBedrockTool(this Tool tool, ToolUseBlock toolUse, ConversationRole role)
 		{
-			var pendingToolUse = new AgentResult.PendingToolUse
+			var pendingToolUse = new ToolUsing.ToolUse
 			{
 				ToolUseId = toolUse.ToolUseId,
 				ToolName = toolUse.Name,
 				ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
 			};
-			var result = await new BedrockAgent(null!, null!, null!).Use(tool, pendingToolUse, role, null!, null);
+			var result = await ToolUsing.Use(tool, pendingToolUse, role, null!, null);
 			return (BedrockAgent.GetAsToolResultMessage(toolUse.ToolUseId, result.Item1?.Result), result.Item2);
 		}
 

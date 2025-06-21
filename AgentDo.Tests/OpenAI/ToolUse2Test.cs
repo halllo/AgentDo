@@ -1,4 +1,5 @@
-﻿using OpenAI.Chat;
+﻿using AgentDo.OpenAI;
+using OpenAI.Chat;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
@@ -27,7 +28,7 @@ namespace AgentDo.Tests.OpenAI
 
 			ChatCompletion completion = await client.CompleteChatAsync(messages, new()
 			{
-				Tools = { tool.AsOpenAITool() },
+				Tools = { OpenAIAgent.CreateTool(tool) },
 				Temperature = 0.0f,
 			});
 

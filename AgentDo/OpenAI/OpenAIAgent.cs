@@ -9,7 +9,7 @@ using static AgentDo.AgentResult;
 
 namespace AgentDo.OpenAI
 {
-	public class OpenAIAgent : ToolUsing<ChatTool>, IAgent
+	public class OpenAIAgent : IAgent
 	{
 		private readonly ChatClient client;
 		private readonly ILogger<OpenAIAgent> logger;
@@ -58,7 +58,7 @@ namespace AgentDo.OpenAI
 			};
 			foreach (var tool in tools)
 			{
-				completionOptions.Tools.Add(GetToolDefinition(tool));
+				completionOptions.Tools.Add(CreateTool(tool));
 			}
 
 			bool keepConversing = true;
@@ -69,7 +69,7 @@ namespace AgentDo.OpenAI
 				{
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -130,14 +130,16 @@ namespace AgentDo.OpenAI
 					{
 						case ChatFinishReason.ToolCalls:
 							{
-								var toolUses = new List<PendingToolUse>();
-								foreach (var toolUse in completion.ToolCalls) toolUses.Add(new PendingToolUse
-								{
-									ToolUseId = toolUse.Id,
-									ToolName = toolUse.FunctionName,
-									ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
-									ToolResult = null,
-								});
+								var toolUses = completion.ToolCalls
+									.Select(toolUse => new ToolUsing.ToolUse
+									{
+										ToolUseId = toolUse.Id,
+										ToolName = toolUse.FunctionName,
+										ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
+										ToolResult = null,
+									})
+									.ToList();
+
 								foreach (var toolUse in toolUses)
 								{
 									cancellationToken.ThrowIfCancellationRequested();
@@ -146,7 +148,7 @@ namespace AgentDo.OpenAI
 										toolResults: null,
 										generationData: generationData));
 
-									var (toolResult, requiresApproval) = await Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
+									var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
 
 									if (toolResult == null && requiresApproval != null)
 									{
@@ -199,12 +201,13 @@ namespace AgentDo.OpenAI
 			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
-		protected override ChatTool CreateTool(string name, string description, JsonDocument schema)
+		public static ChatTool CreateTool(Tool tool)
 		{
+			var definition = ToolUsing.GetToolDefinition(tool);
 			return ChatTool.CreateFunctionTool(
-				functionName: name,
-				functionDescription: description,
-				functionParameters: BinaryData.FromString(schema.RootElement.GetRawText())
+				functionName: definition.Name,
+				functionDescription: definition.Description,
+				functionParameters: BinaryData.FromString(definition.Schema.RootElement.GetRawText())
 			);
 		}
 

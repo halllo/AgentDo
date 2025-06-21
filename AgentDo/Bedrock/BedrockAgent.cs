@@ -11,7 +11,7 @@ using static AgentDo.AgentResult;
 
 namespace AgentDo.Bedrock
 {
-	public class BedrockAgent : ToolUsing<Amazon.BedrockRuntime.Model.Tool>, IAgent
+	public class BedrockAgent : IAgent
 	{
 		private readonly IAmazonBedrockRuntime bedrock;
 		private readonly ILogger<BedrockAgent> logger;
@@ -55,7 +55,7 @@ namespace AgentDo.Bedrock
 
 			var toolConfig = new ToolConfiguration()
 			{
-				Tools = [.. tools.Select(GetToolDefinition)]
+				Tools = [.. tools.Select(t => CreateTool(t))]
 			};
 
 			var inferenceConfig = new InferenceConfiguration()
@@ -69,14 +69,14 @@ namespace AgentDo.Bedrock
 			{
 				if (pendingToolUses != null)
 				{
-					var toolResults = new List<ToolResultBlock>();
-					foreach (var toolUse in pendingToolUses.Uses.TakeWhile(t => t.ToolResult != null))
-					{
-						toolResults.Add(JsonSerializer.Deserialize<ToolResultBlock>(toolUse.ToolResult!)!);
-					}
+					var toolResults = pendingToolUses.Uses
+						.TakeWhile(t => t.ToolResult != null)
+						.Select(toolUse => JsonSerializer.Deserialize<ToolResultBlock>(toolUse.ToolResult!)!)
+						.ToList();
+					
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -147,26 +147,26 @@ namespace AgentDo.Bedrock
 
 					if (response.StopReason == StopReason.Tool_use)
 					{
-						var toolsUse = responseMessage.ToolsUse();
-						var toolResults = new List<ToolResultBlock>();
-						var toolUses = new List<PendingToolUse>();
-						foreach (var toolUse in toolsUse) toolUses.Add(new PendingToolUse
-						{
-							ToolUseId = toolUse.ToolUseId,
-							ToolName = toolUse.Name,
-							ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
-							ToolResult = null,
-						});
+						var toolUses = responseMessage.ToolsUse()
+							.Select(toolUse => new ToolUsing.ToolUse
+							{
+								ToolUseId = toolUse.ToolUseId,
+								ToolName = toolUse.Name,
+								ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
+								ToolResult = null,
+							})
+							.ToList();
 
 						resultMessages.Add(new Message(responseMessage.Role, text,
 							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput.ToJsonString() })],
 							toolResults: null,
 							generationData: generationData));
 
+						var toolResults = new List<ToolResultBlock>();
 						foreach (var toolUse in toolUses)
 						{
 							cancellationToken.ThrowIfCancellationRequested();
-							var (toolResult, requiresApproval) = await Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
+							var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
 
 							if (toolResult == null && requiresApproval != null)
 							{
@@ -218,17 +218,18 @@ namespace AgentDo.Bedrock
 			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
-		protected override Amazon.BedrockRuntime.Model.Tool CreateTool(string name, string description, JsonDocument schema)
+		public static Amazon.BedrockRuntime.Model.Tool CreateTool(Tool tool)
 		{
+			var definition = ToolUsing.GetToolDefinition(tool);
 			return new Amazon.BedrockRuntime.Model.Tool
 			{
 				ToolSpec = new ToolSpecification
 				{
-					Name = name,
-					Description = description,
+					Name = definition.Name,
+					Description = definition.Description,
 					InputSchema = new ToolInputSchema
 					{
-						Json = schema.ToAmazonJson(),
+						Json = definition.Schema.ToAmazonJson(),
 					},
 				}
 			};

@@ -38,7 +38,7 @@ namespace AgentDo.Tests.Bedrock
 				}
 			};
 
-			AssertEqual(expectedTool, Tool.From(getSongTool).AsBedrockTool());
+			AssertEqual(expectedTool, Tool.From(getSongTool).ForBedrock());
 		}
 
 
@@ -69,7 +69,7 @@ namespace AgentDo.Tests.Bedrock
 				}
 			};
 
-			AssertEqual(expectedTool, Tool.From(rateSongTool).AsBedrockTool());
+			AssertEqual(expectedTool, Tool.From(rateSongTool).ForBedrock());
 		}
 
 		[TestMethod]
@@ -93,7 +93,7 @@ namespace AgentDo.Tests.Bedrock
 				int rating
 			) => "Rated!");
 
-			AssertEqual(expectedTool, usableTool.AsBedrockTool());
+			AssertEqual(expectedTool, usableTool.ForBedrock());
 		}
 
 
@@ -123,7 +123,7 @@ namespace AgentDo.Tests.Bedrock
 				toolCall = new RateSongToolWithNestedObjects(song, rating);
 				return "Rated!";
 			});
-			var bedrockTool = usableTool.AsBedrockTool();
+			var bedrockTool = usableTool.ForBedrock();
 			AssertEqual(expectedTool, bedrockTool);
 
 			//Actually processing it as json
@@ -164,7 +164,7 @@ namespace AgentDo.Tests.Bedrock
 				toolCall = new RecognizedAlbum(album, price, clerk, inStock, purchaseCounter);
 				return "";
 			});
-			var bedrockTool = usableTool.AsBedrockTool();
+			var bedrockTool = usableTool.ForBedrock();
 
 			//Actually processing it as json
 			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift. It was already bought three times.", bedrockTool);

@@ -4,13 +4,30 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using static AgentDo.AgentResult;
 
 namespace AgentDo
 {
 	public class ToolUsing
 	{
-		public static JsonObject GetInputsAsSchema(MethodInfo method)
+		public static ToolDefinition GetToolDefinition(Tool tool)
+		{
+			var method = tool.Delegate.GetMethodInfo();
+			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
+
+			if (tool.Schema != null)
+			{
+				return new ToolDefinition(tool.Name, methodDescription, tool.Schema);
+			}
+			else
+			{
+				JsonObject schema = GetInputsAsSchema(method);
+				return new ToolDefinition(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
+			}
+		}
+
+		public record ToolDefinition(string Name, string Description, JsonDocument Schema);
+
+		private static JsonObject GetInputsAsSchema(MethodInfo method)
 		{
 			var methodParameters = method.GetParameters().Where(p => p.ParameterType != typeof(Tool.Context));
 			var toolPropertiesDictionary = methodParameters.ToDictionary(p => p.Name ?? string.Empty, p => new
@@ -55,7 +72,7 @@ namespace AgentDo
 			}
 		}
 
-		public static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null, CancellationToken cancellationToken = default)
+		private static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null, CancellationToken cancellationToken = default)
 		{
 			var method = tool.GetMethodInfo();
 
@@ -87,31 +104,7 @@ namespace AgentDo
 			return result;
 		}
 
-		public record ToolResult(object? Result);
-		public record ApprovalRequired();
-	}
-
-	public abstract class ToolUsing<TTool> : ToolUsing
-	{
-		public TTool GetToolDefinition(Tool tool)
-		{
-			var method = tool.Delegate.GetMethodInfo();
-			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
-
-			if (tool.Schema != null)
-			{
-				return CreateTool(tool.Name, methodDescription, tool.Schema);
-			}
-			else
-			{
-				JsonObject schema = GetInputsAsSchema(method);
-				return CreateTool(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
-			}
-		}
-
-		protected abstract TTool CreateTool(string name, string description, JsonDocument schema);
-
-		internal async Task<(ToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, PendingToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
+		internal static async Task<(ToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, ToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
 		{
 			var requestedToolName = toolUse.ToolName;
 			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
@@ -134,7 +127,7 @@ namespace AgentDo
 			}
 		}
 
-		public async Task<(ToolResult?, ApprovalRequired?)> Use(Tool tool, PendingToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
+		public static async Task<(ToolResult?, ApprovalRequired?)> Use(Tool tool, ToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
 		{
 			var name = toolUse.ToolName;
 			var id = toolUse.ToolUseId;
@@ -177,5 +170,17 @@ namespace AgentDo
 				return (new ToolResult("failed"), null);
 			}
 		}
+
+		public class ToolUse
+		{
+			public string ToolName { get; set; } = null!;
+			public string ToolUseId { get; set; } = null!;
+			public JsonObject ToolInput { get; set; } = null!;
+			public bool Approved { get; set; }
+			public string? ToolResult { get; set; }
+		}
+
+		public record ToolResult(object? Result);
+		public record ApprovalRequired();
 	}
 }

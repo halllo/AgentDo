@@ -27,7 +27,7 @@ namespace AgentDo.Tests.Local
 				return "registered";
 			});
 
-			var completion = await client.ChatCompletion(messages, [tool.AsOpenAILikeTool()]);
+			var completion = await client.ChatCompletion(messages, [OpenAILikeAgent.CreateTool(tool)]);
 			Assert.IsNotNull(completion.Message.ToolCalls);
 
 			var toolCall = completion.Message.ToolCalls[0];

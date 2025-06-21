@@ -31,7 +31,7 @@ namespace AgentDo.Tests.Bedrock
 			{
 				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
 				Messages = messages,
-				ToolConfig = new ToolConfiguration { Tools = [tool.AsBedrockTool()] },
+				ToolConfig = new ToolConfiguration { Tools = [tool.ForBedrock()] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 

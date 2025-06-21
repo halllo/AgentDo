@@ -4,11 +4,10 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using static AgentDo.AgentResult;
-using static AgentDo.Message;
 
 namespace AgentDo.OpenAI.Like
 {
-	public class OpenAILikeAgent : ToolUsing<OpenAILikeClient.Tool>, IAgent
+	public class OpenAILikeAgent : IAgent
 	{
 		private readonly OpenAILikeClient client;
 		private readonly ILogger<OpenAILikeAgent> logger;
@@ -45,7 +44,7 @@ namespace AgentDo.OpenAI.Like
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
 			foreach (var tool in tools)
 			{
-				toolDefinitions.Add(GetToolDefinition(tool));
+				toolDefinitions.Add(CreateTool(tool));
 			}
 
 			bool keepConversing = true;
@@ -66,8 +65,8 @@ namespace AgentDo.OpenAI.Like
 				{
 					case "tool_calls":
 						{
-							var pendingToolUses = new List<PendingToolUse>();
-							foreach (var toolUse in completion.Message.ToolCalls ?? []) pendingToolUses.Add(new PendingToolUse
+							var pendingToolUses = new List<ToolUsing.ToolUse>();
+							foreach (var toolUse in completion.Message.ToolCalls ?? []) pendingToolUses.Add(new ToolUsing.ToolUse
 							{
 								ToolUseId = toolUse.Id,
 								ToolName = toolUse.Function.Name,
@@ -80,7 +79,7 @@ namespace AgentDo.OpenAI.Like
 								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput.ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
 
-								var (toolResult, requiresApproval) = await Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
+								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 
 								if (toolResult == null && requiresApproval != null)
 								{
@@ -121,12 +120,13 @@ namespace AgentDo.OpenAI.Like
 			return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
 		}
 
-		protected override OpenAILikeClient.Tool CreateTool(string name, string description, JsonDocument schema)
+		public static OpenAILikeClient.Tool CreateTool(Tool tool)
 		{
-			return new(name, description, schema);
+			var definition = ToolUsing.GetToolDefinition(tool);
+			return new(definition.Name, definition.Description, definition.Schema);
 		}
 
-		private OpenAILikeClient.Message GetAsToolResultMessage(string toolUseId, ToolUsing.ToolResult result)
+		public static OpenAILikeClient.Message GetAsToolResultMessage(string toolUseId, ToolUsing.ToolResult result)
 		{
 			return new OpenAILikeClient.Message(
 				Role: "tool",

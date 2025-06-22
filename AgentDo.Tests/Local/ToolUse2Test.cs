@@ -8,7 +8,14 @@ namespace AgentDo.Tests.Local
 	[TestClass]
 	public sealed class ToolUse2Test
 	{
-		record Person(string Name, int Age, Address? Address = null);
+		record Person(
+			string Name,
+			[property: Description("""
+			The age of the person at the current day.
+			If it needs calculation, pay close attention if the birthday of the current year has already occured or not.
+			""")]
+			int Age,
+			Address? Address = null);
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]

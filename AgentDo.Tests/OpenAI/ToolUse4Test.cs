@@ -10,8 +10,16 @@ namespace AgentDo.Tests.OpenAI
 	[TestClass]
 	public sealed class ToolUse4Test
 	{
-		record Person(string Name, int Age, Address? Address = null);
-		record Address(string City, string? Street = null);
+		record Person(
+			string Name,
+			[property: Description("""
+			The age of the person at the current day.
+			If it needs calculation, pay close attention if the birthday of the current year has already occured or not.
+			""")] int Age,
+			Address? Address = null);
+		record Address(
+			string City,
+			string? Street = null);
 
 		[TestMethodWithDI]
 		public async Task OpenAIAgentMultiToolUseWithApproval(ChatClient client, ILoggerFactory loggerFactory)

@@ -41,6 +41,7 @@ namespace AgentDo.Tests.Bedrock
 
 			if (result.NeedsApprovalToContinue)
 			{
+				Assert.IsNull(registeredPerson);
 				result = await result.ApproveAndContinue();
 			}
 			else

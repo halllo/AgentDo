@@ -2,6 +2,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Client;
 
 namespace AgentDo.Cli.Verbs
 {
@@ -13,8 +14,6 @@ namespace AgentDo.Cli.Verbs
 
 		public async Task Do(ILogger<DoTask> logger, [FromKeyedServices("bedrock")] IAgent agent)
 		{
-			//todo: get tools from an mcp server
-
 			Person? registeredPerson = default;
 			var aiFunction = AIFunctionFactory.Create(name: "registerPerson", method: async (Person person) =>
 			{
@@ -23,11 +22,20 @@ namespace AgentDo.Cli.Verbs
 				return new { status = "registered" };
 			});
 
+			await using var mcpClient = await McpClientFactory.CreateAsync(new StdioClientTransport(new()
+			{
+				Name = "Time MCP Server",
+				Command = @"C:\Projects\McpExperiments\MyMCPServer.Stdio\bin\Debug\net9.0\MyMCPServer.Stdio.exe",
+			}));
+			var mcpClientTools = await mcpClient.ListToolsAsync();
+
+
 			await agent.Do(
 				task: Task,
 				tools:
 				[
 					Tool.From(aiFunction),
+					..mcpClientTools.Select(tool => Tool.From(tool)),
 				]);
 		}
 

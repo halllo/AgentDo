@@ -70,14 +70,14 @@ namespace AgentDo.OpenAI.Like
 							{
 								ToolUseId = toolUse.Id,
 								ToolName = toolUse.Function.Name,
-								ToolInput = JsonDocument.Parse(toolUse.Function.Arguments).As<JsonObject>()!,
+								ToolInput = toolUse.Function.Arguments,
 								ToolResult = null,
 								Approved = true, // all tool calls are pre-approved in this implementation
 							});
 							foreach (var toolCall in pendingToolUses)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput.ToJsonString(JsonSchemaExtensions.OutputOptions) }], null));
+								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput }], null));
 
 								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 

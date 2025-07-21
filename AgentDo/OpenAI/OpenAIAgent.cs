@@ -135,7 +135,7 @@ namespace AgentDo.OpenAI
 									{
 										ToolUseId = toolUse.Id,
 										ToolName = toolUse.FunctionName,
-										ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
+										ToolInput = toolUse.FunctionArguments.ToString(),
 										ToolResult = null,
 									})
 									.ToList();
@@ -144,7 +144,7 @@ namespace AgentDo.OpenAI
 								{
 									cancellationToken.ThrowIfCancellationRequested();
 									resultMessages.Add(new(completion.Role.ToString(), text,
-										toolCalls: [new Message.ToolCall { Name = toolUse.ToolName, Id = toolUse.ToolUseId, Input = toolUse.ToolInput.ToJsonString() }],
+										toolCalls: [new Message.ToolCall { Name = toolUse.ToolName, Id = toolUse.ToolUseId, Input = toolUse.ToolInput }],
 										toolResults: null,
 										generationData: generationData));
 

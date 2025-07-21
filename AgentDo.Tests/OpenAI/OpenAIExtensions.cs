@@ -1,7 +1,5 @@
 ﻿using AgentDo.OpenAI;
 using OpenAI.Chat;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace AgentDo.Tests.OpenAI
 {
@@ -13,7 +11,7 @@ namespace AgentDo.Tests.OpenAI
 			{
 				ToolUseId = toolUse.Id,
 				ToolName = toolUse.FunctionName,
-				ToolInput = JsonDocument.Parse(toolUse.FunctionArguments).As<JsonObject>()!,
+				ToolInput = toolUse.FunctionArguments.ToString(),
 			};
 			var result = await ToolUsing.Use(tool, pendingToolUse, role.ToString(), null!, null);
 			return (OpenAIAgent.GetAsToolResultMessage(pendingToolUse.ToolUseId, result.Item1?.Result), result.Item2);

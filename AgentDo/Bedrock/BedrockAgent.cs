@@ -152,13 +152,13 @@ namespace AgentDo.Bedrock
 							{
 								ToolUseId = toolUse.ToolUseId,
 								ToolName = toolUse.Name,
-								ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
+								ToolInput = toolUse.Input.FromAmazonJson(),
 								ToolResult = null,
 							})
 							.ToList();
 
 						resultMessages.Add(new Message(responseMessage.Role, text,
-							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput.ToJsonString() })],
+							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput })],
 							toolResults: null,
 							generationData: generationData));
 

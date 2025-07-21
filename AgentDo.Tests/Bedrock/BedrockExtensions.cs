@@ -1,7 +1,6 @@
 ﻿using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
-using System.Text.Json.Nodes;
 
 namespace AgentDo.Tests.Bedrock
 {
@@ -18,7 +17,7 @@ namespace AgentDo.Tests.Bedrock
 			{
 				ToolUseId = toolUse.ToolUseId,
 				ToolName = toolUse.Name,
-				ToolInput = toolUse.Input.FromAmazonJson<JsonObject>()!,
+				ToolInput = toolUse.Input.FromAmazonJson(),
 			};
 			var result = await ToolUsing.Use(tool, pendingToolUse, role, null!, null);
 			return (BedrockAgent.GetAsToolResultMessage(toolUse.ToolUseId, result.Item1?.Result), result.Item2);

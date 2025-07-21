@@ -1,6 +1,4 @@
 ﻿using AgentDo.OpenAI.Like;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace AgentDo.Tests.Local
 {
@@ -12,7 +10,7 @@ namespace AgentDo.Tests.Local
 			{
 				ToolUseId = toolUse.Id,
 				ToolName = toolUse.Function.Name,
-				ToolInput = JsonDocument.Parse(toolUse.Function.Arguments).As<JsonObject>()!,
+				ToolInput = toolUse.Function.Arguments,
 			};
 			return await ToolUsing.Use(tool, pendingToolUse, role, null!, null);
 		}

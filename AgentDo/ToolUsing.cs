@@ -131,7 +131,7 @@ namespace AgentDo
 		{
 			var name = toolUse.ToolName;
 			var id = toolUse.ToolUseId;
-			var inputs = toolUse.ToolInput;
+			var inputs = JsonNode.Parse(toolUse.ToolInput)!.AsObject();
 			var logItsAndOutputs = tool.LogInputsAndOutputs;
 
 			if (tool.RequireApproval && !toolUse.Approved)
@@ -175,7 +175,7 @@ namespace AgentDo
 		{
 			public string ToolName { get; set; } = null!;
 			public string ToolUseId { get; set; } = null!;
-			public JsonObject ToolInput { get; set; } = null!;
+			public string ToolInput { get; set; } = null!;
 			public bool Approved { get; set; }
 			public string? ToolResult { get; set; }
 		}

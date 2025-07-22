@@ -32,7 +32,7 @@ namespace AgentDo.Tests.Bedrock
 				}
 			};
 
-			var response = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
+			var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 			{
 				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
 				Messages = messages,
@@ -40,47 +40,19 @@ namespace AgentDo.Tests.Bedrock
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
 			});
 
-			await foreach (var streamed in response.Stream)
-			{
-				switch (streamed)
-				{
-					case MessageStartEvent start:
-						Console.WriteLine($"Message started by {start.Role}");
-						break;
-					case MessageStopEvent stop:
-						Console.WriteLine($"Message stopped because {stop.StopReason}");
-						break;
-					case ContentBlockStartEvent start:
-						Console.WriteLine($"Content block {start.ContentBlockIndex} started {JsonSerializer.Serialize(start.Start)}");
-						break;
-					case ContentBlockDeltaEvent delta:
-						Console.WriteLine($"Content block {delta.ContentBlockIndex} delta {JsonSerializer.Serialize(delta.Delta)}");
-						break;
-					case ContentBlockStopEvent stop:
-						Console.WriteLine($"Content block {stop.ContentBlockIndex} stopped");
-						break;
-					case ConverseStreamMetadataEvent metadata:
-						Console.WriteLine($"Usage: {JsonSerializer.Serialize(metadata.Usage)}");
-						break;
-					default: throw new ArgumentOutOfRangeException(nameof(streamed), streamed, "Unexpected type.");
-				}
-			}
+			var (responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage();
+			Assert.AreEqual(2, responseMessage.Content.Count);
 
-			Assert.Inconclusive("todo: assert tool call!");
+			var text = responseMessage.Content[0].Text;
+			Console.WriteLine(text);
 
-			//var responseMessage = response.Output.Message;
-			//Assert.AreEqual(2, responseMessage.Content.Count);
-
-			//var text = responseMessage.Content[0].Text;
-			//Console.WriteLine(text);
-
-			//var person = responseMessage.Content[1].ToolUse.Input.FromAmazonJson<Person>()!;
-			//Console.WriteLine(JsonSerializer.Serialize(person));
-			//Assert.AreEqual("Manuel Naujoks", person.Name);
-			//Assert.AreEqual(38, person.Age);
-			//Assert.IsNotNull(person.Address);
-			//Assert.AreEqual("Karlsruhe", person.Address!.City);
-			//Assert.IsNull(person.Address!.Street);
+			var person = responseMessage.Content[1].ToolUse.Input.FromAmazonJson<Person>()!;
+			Console.WriteLine(JsonSerializer.Serialize(person));
+			Assert.AreEqual("Manuel Naujoks", person.Name);
+			Assert.AreEqual(38, person.Age);
+			Assert.IsNotNull(person.Address);
+			Assert.AreEqual("Karlsruhe", person.Address!.City);
+			Assert.IsNull(person.Address!.Street);
 		}
 	}
 }

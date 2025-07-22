@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using static AgentDo.AgentResult;
 
 namespace AgentDo.OpenAI.Like
@@ -20,7 +19,7 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
@@ -40,6 +39,7 @@ namespace AgentDo.OpenAI.Like
 			resultMessages.Add(new(taskMessage.Role, taskMessage.Content!, null, null));
 
 			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
+			onMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
 
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
 			foreach (var tool in tools)
@@ -58,6 +58,7 @@ namespace AgentDo.OpenAI.Like
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogInformation("{Role}: {Text}", completion.Message.Role, text);
+					onMessage?.Invoke(completion.Message.Role, text);
 					context.Text = text;
 				}
 

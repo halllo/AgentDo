@@ -132,7 +132,7 @@ namespace AgentDo
 			var name = toolUse.ToolName;
 			var id = toolUse.ToolUseId;
 			var inputs = JsonNode.Parse(toolUse.ToolInput)!.AsObject();
-			var logItsAndOutputs = tool.LogInputsAndOutputs;
+			var logInputsAndOutputs = tool.LogInputsAndOutputs;
 
 			if (tool.RequireApproval && !toolUse.Approved)
 			{
@@ -144,7 +144,7 @@ namespace AgentDo
 			{
 				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
 				{
-					if (logItsAndOutputs)
+					if (logInputsAndOutputs)
 					{
 						logger?.LogInformation("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
 					}
@@ -154,7 +154,7 @@ namespace AgentDo
 					}
 				}, cancellationToken);
 
-				if (logItsAndOutputs)
+				if (logInputsAndOutputs)
 				{
 					logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
 				}

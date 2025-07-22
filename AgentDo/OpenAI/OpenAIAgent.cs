@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using static AgentDo.AgentResult;
 
 namespace AgentDo.OpenAI
@@ -22,7 +21,7 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
@@ -50,6 +49,7 @@ namespace AgentDo.OpenAI
 				messages.Add(taskMessage);
 				resultMessages.Add(new(ChatMessageRole.User.ToString(), taskMessage.Text(), null, null));
 				if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
+				onMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
 			}
 
 			var completionOptions = new ChatCompletionOptions()
@@ -115,6 +115,7 @@ namespace AgentDo.OpenAI
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogInformation("{Role}: {Text}", completion.Role, text);
+						onMessage?.Invoke(completion.Role.ToString(), text);
 						context.Text = text;
 					}
 

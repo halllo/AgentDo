@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using System.Collections;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using static AgentDo.AgentResult;
 
 namespace AgentDo.Bedrock
@@ -24,7 +23,7 @@ namespace AgentDo.Bedrock
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
 		{
 			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
@@ -49,6 +48,7 @@ namespace AgentDo.Bedrock
 				: null;
 
 			if (taskMessage != null && options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+			if (taskMessage != null && onMessage != null) onMessage(taskMessage.Role, taskMessage.Text());
 
 			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
 			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text())] : []).ToList();
@@ -73,7 +73,7 @@ namespace AgentDo.Bedrock
 						.TakeWhile(t => t.ToolResult != null)
 						.Select(toolUse => JsonSerializer.Deserialize<ToolResultBlock>(toolUse.ToolResult!)!)
 						.ToList();
-					
+
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
 						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
@@ -115,13 +115,27 @@ namespace AgentDo.Bedrock
 				else
 				{
 					var converseDurationStopwatch = Stopwatch.StartNew();
-					var response = await bedrock.ConverseAsync(new ConverseRequest
+					//var response = await bedrock.ConverseAsync(new ConverseRequest
+					//{
+					//	ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+					//	Messages = messages,
+					//	ToolConfig = toolConfig,
+					//	InferenceConfig = inferenceConfig,
+					//}, cancellationToken);
+
+					//var responseMessage = response.Output.Message;
+					//var tokenUsage = response.Usage;
+					//var stopReason = response.StopReason;
+
+					var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 					{
 						ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
 						Messages = messages,
 						ToolConfig = toolConfig,
 						InferenceConfig = inferenceConfig,
 					}, cancellationToken);
+
+					var (responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage();
 
 					//rewind streams in case we want to send them again
 					foreach (var stream in Enumerable
@@ -133,19 +147,19 @@ namespace AgentDo.Bedrock
 
 					converseDurationStopwatch.Stop();
 
-					var responseMessage = response.Output.Message;
 					messages.Add(responseMessage);
 
 					var text = responseMessage.Text();
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogInformation("{Role}: {Text}", responseMessage.Role, text);
+						onMessage?.Invoke(responseMessage.Role, text);
 						context.Text = text;
 					}
 
-					var generationData = new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = response.Usage.InputTokens, OutputTokens = response.Usage.OutputTokens };
+					var generationData = new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow, Duration = converseDurationStopwatch.Elapsed, InputTokens = tokenUsage.InputTokens, OutputTokens = tokenUsage.OutputTokens };
 
-					if (response.StopReason == StopReason.Tool_use)
+					if (stopReason == StopReason.Tool_use)
 					{
 						var toolUses = responseMessage.ToolsUse()
 							.Select(toolUse => new ToolUsing.ToolUse

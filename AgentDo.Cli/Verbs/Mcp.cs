@@ -29,14 +29,14 @@ namespace AgentDo.Cli.Verbs
 			}));
 			var mcpClientTools = await mcpClient.ListToolsAsync();
 
-
 			await agent.Do(
 				task: Task,
 				tools:
 				[
 					Tool.From(aiFunction),
 					..mcpClientTools.Select(tool => Tool.From(tool)),
-				]);
+				],
+				events: AgentOutput.Events());
 		}
 
 		record Person(string Name, Address? Address = null);

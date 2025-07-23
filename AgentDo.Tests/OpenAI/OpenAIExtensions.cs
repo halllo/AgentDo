@@ -13,7 +13,7 @@ namespace AgentDo.Tests.OpenAI
 				ToolName = toolUse.FunctionName,
 				ToolInput = toolUse.FunctionArguments.ToString(),
 			};
-			var result = await ToolUsing.Use(tool, pendingToolUse, role.ToString(), null!, null);
+			var result = await ToolUsing.Use(tool, pendingToolUse, role.ToString(), null!, null, null);
 			return (OpenAIAgent.GetAsToolResultMessage(pendingToolUse.ToolUseId, result.Item1?.Result), result.Item2);
 		}
 	}

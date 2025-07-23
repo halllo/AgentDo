@@ -12,7 +12,7 @@ namespace AgentDo.Tests.Local
 				ToolName = toolUse.Function.Name,
 				ToolInput = toolUse.Function.Arguments,
 			};
-			return await ToolUsing.Use(tool, pendingToolUse, role, null!, null);
+			return await ToolUsing.Use(tool, pendingToolUse, role, null!, null, null);
 		}
 	}
 }

@@ -19,7 +19,7 @@ namespace AgentDo.OpenAI.Like
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, Events? events = null, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
@@ -38,8 +38,11 @@ namespace AgentDo.OpenAI.Like
 			messages.Add(taskMessage);
 			resultMessages.Add(new(taskMessage.Role, taskMessage.Content!, null, null));
 
-			if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
-			onMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
+			if (options.Value.LogTask)
+			{
+				logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
+				events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
+			}
 
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
 			foreach (var tool in tools)
@@ -57,8 +60,8 @@ namespace AgentDo.OpenAI.Like
 				var text = completion.Message.Content;
 				if (!string.IsNullOrWhiteSpace(text))
 				{
-					logger.LogInformation("{Role}: {Text}", completion.Message.Role, text);
-					onMessage?.Invoke(completion.Message.Role, text);
+					logger.LogDebug("{Role}: {Text}", completion.Message.Role, text);
+					events?.AfterMessage?.Invoke(completion.Message.Role, text);
 					context.Text = text;
 				}
 
@@ -80,7 +83,7 @@ namespace AgentDo.OpenAI.Like
 								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput }], null));
 
-								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
+								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, events, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 
 								if (toolResult == null && requiresApproval != null)
 								{

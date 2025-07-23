@@ -19,7 +19,7 @@ namespace AgentDo.Tests.Bedrock
 				ToolName = toolUse.Name,
 				ToolInput = toolUse.Input.FromAmazonJson(),
 			};
-			var result = await ToolUsing.Use(tool, pendingToolUse, role, null!, null);
+			var result = await ToolUsing.Use(tool, pendingToolUse, role, null!, null, null);
 			return (BedrockAgent.GetAsToolResultMessage(toolUse.ToolUseId, result.Item1?.Result), result.Item2);
 		}
 

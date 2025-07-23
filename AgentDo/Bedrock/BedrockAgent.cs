@@ -23,7 +23,7 @@ namespace AgentDo.Bedrock
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, Events? events = null, CancellationToken cancellationToken = default)
 		{
 			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
@@ -47,8 +47,14 @@ namespace AgentDo.Bedrock
 					documents: documents)
 				: null;
 
-			if (taskMessage != null && options.Value.LogTask) logger.LogInformation("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
-			if (taskMessage != null && onMessage != null) onMessage(taskMessage.Role, taskMessage.Text());
+			if (taskMessage != null)
+			{
+				if (options.Value.LogTask)
+				{
+					logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
+					events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text());
+				}
+			}
 
 			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
 			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text())] : []).ToList();
@@ -76,7 +82,7 @@ namespace AgentDo.Bedrock
 
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -115,27 +121,36 @@ namespace AgentDo.Bedrock
 				else
 				{
 					var converseDurationStopwatch = Stopwatch.StartNew();
-					//var response = await bedrock.ConverseAsync(new ConverseRequest
-					//{
-					//	ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
-					//	Messages = messages,
-					//	ToolConfig = toolConfig,
-					//	InferenceConfig = inferenceConfig,
-					//}, cancellationToken);
 
-					//var responseMessage = response.Output.Message;
-					//var tokenUsage = response.Usage;
-					//var stopReason = response.StopReason;
-
-					var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
+					Amazon.BedrockRuntime.Model.Message responseMessage;
+					TokenUsage tokenUsage;
+					StopReason stopReason;
+					if (options.Value.Streaming)
 					{
-						ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
-						Messages = messages,
-						ToolConfig = toolConfig,
-						InferenceConfig = inferenceConfig,
-					}, cancellationToken);
+						var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
+						{
+							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+							Messages = messages,
+							ToolConfig = toolConfig,
+							InferenceConfig = inferenceConfig,
+						}, cancellationToken);
 
-					var (responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage();
+						(responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage(events);
+					}
+					else
+					{
+						var response = await bedrock.ConverseAsync(new ConverseRequest
+						{
+							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+							Messages = messages,
+							ToolConfig = toolConfig,
+							InferenceConfig = inferenceConfig,
+						}, cancellationToken);
+
+						responseMessage = response.Output.Message;
+						tokenUsage = response.Usage;
+						stopReason = response.StopReason;
+					}
 
 					//rewind streams in case we want to send them again
 					foreach (var stream in Enumerable
@@ -152,8 +167,8 @@ namespace AgentDo.Bedrock
 					var text = responseMessage.Text();
 					if (!string.IsNullOrWhiteSpace(text))
 					{
-						logger.LogInformation("{Role}: {Text}", responseMessage.Role, text);
-						onMessage?.Invoke(responseMessage.Role, text);
+						logger.LogDebug("{Role}: {Text}", responseMessage.Role, text);
+						events?.AfterMessage?.Invoke(responseMessage.Role, text);
 						context.Text = text;
 					}
 
@@ -180,7 +195,7 @@ namespace AgentDo.Bedrock
 						foreach (var toolUse in toolUses)
 						{
 							cancellationToken.ThrowIfCancellationRequested();
-							var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, responseMessage.Role, context, logger, cancellationToken: cancellationToken);
+							var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, responseMessage.Role, context, events, logger, cancellationToken: cancellationToken);
 
 							if (toolResult == null && requiresApproval != null)
 							{

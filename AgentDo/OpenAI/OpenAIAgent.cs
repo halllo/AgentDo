@@ -21,7 +21,7 @@ namespace AgentDo.OpenAI
 			this.options = options;
 		}
 
-		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, OnMessage? onMessage = null, CancellationToken cancellationToken = default)
+		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, Events? events = null, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
 			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
@@ -48,8 +48,11 @@ namespace AgentDo.OpenAI
 			{
 				messages.Add(taskMessage);
 				resultMessages.Add(new(ChatMessageRole.User.ToString(), taskMessage.Text(), null, null));
-				if (options.Value.LogTask) logger.LogInformation("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
-				onMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
+				if (options.Value.LogTask)
+				{
+					logger.LogDebug("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
+					events?.AfterMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
+				}
 			}
 
 			var completionOptions = new ChatCompletionOptions()
@@ -69,7 +72,7 @@ namespace AgentDo.OpenAI
 				{
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -114,8 +117,8 @@ namespace AgentDo.OpenAI
 					var text = completion.Text();
 					if (!string.IsNullOrWhiteSpace(text))
 					{
-						logger.LogInformation("{Role}: {Text}", completion.Role, text);
-						onMessage?.Invoke(completion.Role.ToString(), text);
+						logger.LogDebug("{Role}: {Text}", completion.Role, text);
+						events?.AfterMessage?.Invoke(completion.Role.ToString(), text);
 						context.Text = text;
 					}
 
@@ -149,7 +152,7 @@ namespace AgentDo.OpenAI
 										toolResults: null,
 										generationData: generationData));
 
-									var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, completion.Role.ToString(), context, logger, cancellationToken: cancellationToken);
+									var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, completion.Role.ToString(), context, events, logger, cancellationToken: cancellationToken);
 
 									if (toolResult == null && requiresApproval != null)
 									{

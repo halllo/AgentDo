@@ -14,6 +14,9 @@ namespace AgentDo.Bedrock
 		public static Document ToAmazonJson(this JsonDocument json) => json.RootElement.GetRawText().ToAmazonJson();
 		public static Document ToAmazonJson(this string json)
 		{
+			if (string.IsNullOrWhiteSpace(json))
+				return new Document(new Dictionary<string, Document>());
+
 			using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
 			using var context = new JsonUnmarshallerContext(stream, false, null);
 			var reader = new StreamingUtf8JsonReader(stream);
@@ -34,6 +37,14 @@ namespace AgentDo.Bedrock
 				jsonWriter.Flush();
 				var marshalled = Encoding.UTF8.GetString(stream.ToArray());
 				return marshalled;
+			}
+			else if (amazonJson.IsNull())
+			{
+				return string.Empty;
+			}
+			else if (amazonJson.IsString())
+			{
+				return amazonJson.AsString();
 			}
 			else
 			{

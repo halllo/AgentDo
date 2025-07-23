@@ -104,7 +104,7 @@ namespace AgentDo
 			return result;
 		}
 
-		internal static async Task<(ToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, ToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
+		internal static async Task<(ToolResult?, ApprovalRequired?)> Use(IEnumerable<Tool> tools, ToolUse toolUse, string role, Tool.Context context, Events? events, ILogger? logger, bool ignoreInvalidSchema = false, bool ignoreUnknownTools = false, CancellationToken cancellationToken = default)
 		{
 			var requestedToolName = toolUse.ToolName;
 			var toolToUse = tools.Where(tool => tool.Name == requestedToolName).SingleOrDefault();
@@ -123,11 +123,11 @@ namespace AgentDo
 			}
 			else
 			{
-				return await Use(toolToUse, toolUse, role, context, logger, ignoreInvalidSchema: ignoreInvalidSchema, cancellationToken: cancellationToken);
+				return await Use(toolToUse, toolUse, role, context, events, logger, ignoreInvalidSchema: ignoreInvalidSchema, cancellationToken: cancellationToken);
 			}
 		}
 
-		public static async Task<(ToolResult?, ApprovalRequired?)> Use(Tool tool, ToolUse toolUse, string role, Tool.Context context, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
+		public static async Task<(ToolResult?, ApprovalRequired?)> Use(Tool tool, ToolUse toolUse, string role, Tool.Context context, Events? events, ILogger? logger, bool ignoreInvalidSchema = false, CancellationToken cancellationToken = default)
 		{
 			var name = toolUse.ToolName;
 			var id = toolUse.ToolUseId;
@@ -146,22 +146,24 @@ namespace AgentDo
 				{
 					if (logInputsAndOutputs)
 					{
-						logger?.LogInformation("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
+						logger?.LogDebug("{Role}: Invoking {ToolUse}({Parameters})...", role, name, JsonSerializer.Serialize(parameters));
 					}
 					else
 					{
-						logger?.LogInformation("{Role}: Invoking {ToolUse}()...", role, name);
+						logger?.LogDebug("{Role}: Invoking {ToolUse}()...", role, name);
 					}
+					events?.BeforeToolCall?.Invoke(role, tool, toolUse, context, parameters);
 				}, cancellationToken);
 
 				if (logInputsAndOutputs)
 				{
-					logger?.LogInformation("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
+					logger?.LogDebug("{Tool}: {Result}" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id, JsonSerializer.Serialize(result));
 				}
 				else
 				{
-					logger?.LogInformation("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
+					logger?.LogDebug("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
 				}
+				events?.AfterToolCall?.Invoke(id, tool, toolUse, context, result);
 				return (new ToolResult(result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)

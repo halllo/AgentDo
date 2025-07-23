@@ -42,7 +42,8 @@ namespace AgentDo.Cli.Verbs
 						logger.LogWarning("Could not classify {file}.", FileToClassify);
 						context.Cancelled = true;
 					})
-				]);
+				],
+				events: AgentOutput.Events());
 		}
 
 		private static FileInfo[] ConvertPagesToImages(FileInfo pdf, ILogger<DoTask> logger)

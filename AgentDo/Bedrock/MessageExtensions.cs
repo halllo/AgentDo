@@ -1,10 +1,12 @@
 ﻿using AgentDo.Content;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
+using System.Text;
+using System.Text.Json;
 
 namespace AgentDo.Bedrock
 {
-	public static class ConverseExtensions
+	public static class MessageExtensions
 	{
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ContentBlock content) => new() { Role = role, Content = [content] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
@@ -76,6 +78,97 @@ namespace AgentDo.Bedrock
 					Bytes = document.Stream,
 				},
 			};
+		}
+
+		public static async Task<(Amazon.BedrockRuntime.Model.Message, TokenUsage, StopReason)> ToMessage(this ConverseStreamResponse response, Events? events = null, bool log = false)
+		{
+			var fullResponse = new StringBuilder();
+			var currentContentBlockStart = default(ContentBlockStart?);
+			var responseMessage = new Amazon.BedrockRuntime.Model.Message
+			{
+				Role = ConversationRole.Assistant,
+				Content = new List<ContentBlock>(),
+			};
+			TokenUsage? tokenUsage = default;
+			StopReason? stopReason = default;
+
+			await foreach (var streamed in response.Stream)
+			{
+				switch (streamed)
+				{
+					case MessageStartEvent start:
+						{
+							if (log) Console.WriteLine($"Message started by {start.Role}");
+							responseMessage.Role = start.Role;
+							events?.BeforeMessage?.Invoke(responseMessage.Role, string.Empty);
+							break;
+						}
+					case MessageStopEvent stop:
+						{
+							if (log) Console.WriteLine($"Message stopped because {stop.StopReason}");
+							stopReason = stop.StopReason;
+							break;
+						}
+					case ContentBlockStartEvent start:
+						{
+							if (log) Console.WriteLine($"Content block {start.ContentBlockIndex} started {JsonSerializer.Serialize(start.Start)}");
+							currentContentBlockStart = start.Start;
+							break;
+						}
+					case ContentBlockDeltaEvent delta:
+						{
+							if (log) Console.WriteLine($"Content block {delta.ContentBlockIndex} delta {JsonSerializer.Serialize(delta.Delta)}");
+							if (currentContentBlockStart?.ToolUse is not null)
+							{
+								fullResponse.Append(delta.Delta.ToolUse.Input);
+							}
+							else
+							{
+								var text = delta.Delta.Text;
+								if (fullResponse.Length == 0) text = text.TrimStart();
+								fullResponse.Append(text);
+								events?.OnMessageDelta?.Invoke(responseMessage.Role, text);
+							}
+							break;
+						}
+					case ContentBlockStopEvent stop:
+						{
+							if (log) Console.WriteLine($"Content block {stop.ContentBlockIndex} stopped");
+							var text = fullResponse.ToString();
+							fullResponse.Clear();
+							if (currentContentBlockStart?.ToolUse is not null)
+							{
+								responseMessage.Content.Add(new ContentBlock
+								{
+									ToolUse = new ToolUseBlock
+									{
+										Name = currentContentBlockStart.ToolUse.Name,
+										ToolUseId = currentContentBlockStart.ToolUse.ToolUseId,
+										Input = text.ToAmazonJson(),
+									}
+								});
+							}
+							else
+							{
+								responseMessage.Content.Add(new ContentBlock
+								{
+									Text = text,
+								});
+							}
+							currentContentBlockStart = null;
+							break;
+						}
+					case ConverseStreamMetadataEvent metadata:
+						{
+							if (log) Console.WriteLine($"Usage: {JsonSerializer.Serialize(metadata.Usage)}");
+							tokenUsage = metadata.Usage;
+							break;
+						}
+					default: throw new ArgumentOutOfRangeException(nameof(streamed), streamed, "Unexpected type.");
+				}
+			}
+
+			return (responseMessage, tokenUsage!, stopReason!);
 		}
 	}
 }

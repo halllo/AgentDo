@@ -1,10 +1,10 @@
-﻿using AgentDo.Content;
+﻿using AgentDo.Bedrock;
+using AgentDo.Content;
 using CommandLine;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PDFtoImage;
-using System;
 using System.ComponentModel;
 
 namespace AgentDo.Cli.Verbs
@@ -15,8 +15,13 @@ namespace AgentDo.Cli.Verbs
 		[Value(0, MetaName = "Task", Required = true)]
 		public string Task { get; set; } = null!;
 
-		public async Task Do(ILogger<DoTask> logger, [FromKeyedServices("bedrock")] IAgent agent)
+		[Option(longName: "streaming", Required = false)]
+		public bool Streaming { get; set; }
+
+		public async Task Do(ILogger<DoTask> logger, [FromKeyedServices("bedrock")] IAgent agent, IOptions<BedrockAgentOptions> options)
 		{
+			options.Value.Streaming = Streaming;
+
 			logger.LogInformation("Doing task: {Task}", Task);
 			await agent.Do(
 				task: Task,
@@ -74,7 +79,8 @@ namespace AgentDo.Cli.Verbs
 
 						return "processed";
 					}),
-				]);
+				],
+				events: AgentOutput.Events(Streaming));
 		}
 
 		record CreditCardStatement(

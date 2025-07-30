@@ -52,14 +52,15 @@ namespace AgentDo.Bedrock
 				if (options.Value.LogTask)
 				{
 					logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
-					events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text());
+					var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text());
+					if (eventTask != null) await eventTask;
 				}
 			}
 
 			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
 			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text())] : []).ToList();
 
-			var toolConfig = new ToolConfiguration()
+			var toolConfig = tools.Count == 0 ? null : new ToolConfiguration()
 			{
 				Tools = [.. tools.Select(t => CreateTool(t))]
 			};
@@ -168,7 +169,8 @@ namespace AgentDo.Bedrock
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogDebug("{Role}: {Text}", responseMessage.Role, text);
-						events?.AfterMessage?.Invoke(responseMessage.Role, text);
+						var eventTask = events?.AfterMessage?.Invoke(responseMessage.Role, text);
+						if (eventTask != null) await eventTask;
 						context.Text = text;
 					}
 

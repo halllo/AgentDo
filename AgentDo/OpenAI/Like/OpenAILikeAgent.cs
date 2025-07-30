@@ -41,7 +41,8 @@ namespace AgentDo.OpenAI.Like
 			if (options.Value.LogTask)
 			{
 				logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
-				events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
+				var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
+				if (eventTask != null) await eventTask;
 			}
 
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
@@ -61,7 +62,8 @@ namespace AgentDo.OpenAI.Like
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogDebug("{Role}: {Text}", completion.Message.Role, text);
-					events?.AfterMessage?.Invoke(completion.Message.Role, text);
+					var eventTask = events?.AfterMessage?.Invoke(completion.Message.Role, text);
+					if (eventTask != null) await eventTask;
 					context.Text = text;
 				}
 

@@ -9,7 +9,7 @@
 		public AfterToolCall? AfterToolCall { get; set; }
 	}
 
-	public delegate void OnMessage(string role, string message);
-	public delegate void BeforeToolCall(string role, Tool tool, ToolUsing.ToolUse toolUse, Tool.Context? context, object?[] parameters);
-	public delegate void AfterToolCall(string role, Tool tool, ToolUsing.ToolUse toolUse, Tool.Context? context, object? result);
+	public delegate Task OnMessage(string role, string message);
+	public delegate Task BeforeToolCall(string role, Tool tool, ToolUsing.ToolUse toolUse, Tool.Context? context, object?[] parameters);
+	public delegate Task AfterToolCall(string role, Tool tool, ToolUsing.ToolUse toolUse, Tool.Context? context, object? result);
 }

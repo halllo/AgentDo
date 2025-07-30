@@ -72,7 +72,7 @@ namespace AgentDo
 			}
 		}
 
-		private static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Action<object?[]>? beforeInvoke = null, CancellationToken cancellationToken = default)
+		private static async Task<object?> Use(Delegate tool, JsonObject inputs, Tool.Context context, Func<object?[], Task>? beforeInvoke = null, CancellationToken cancellationToken = default)
 		{
 			var method = tool.GetMethodInfo();
 
@@ -86,7 +86,8 @@ namespace AgentDo
 				)
 				.ToArray();
 
-			beforeInvoke?.Invoke(parameters);
+			var invokeTask = beforeInvoke?.Invoke(parameters);
+			if (invokeTask != null) await invokeTask;
 
 			var returnValue = tool.DynamicInvoke(parameters);
 			object? result;
@@ -142,7 +143,7 @@ namespace AgentDo
 
 			try
 			{
-				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: parameters =>
+				object? result = await Use(tool.Delegate, inputs, context, beforeInvoke: async parameters =>
 				{
 					if (logInputsAndOutputs)
 					{
@@ -152,7 +153,8 @@ namespace AgentDo
 					{
 						logger?.LogDebug("{Role}: Invoking {ToolUse}()...", role, name);
 					}
-					events?.BeforeToolCall?.Invoke(role, tool, toolUse, context, parameters);
+					var eventTask = events?.BeforeToolCall?.Invoke(role, tool, toolUse, context, parameters);
+					if (eventTask != null) await eventTask;
 				}, cancellationToken);
 
 				if (logInputsAndOutputs)
@@ -163,7 +165,8 @@ namespace AgentDo
 				{
 					logger?.LogDebug("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
 				}
-				events?.AfterToolCall?.Invoke(id, tool, toolUse, context, result);
+				var eventTask = events?.AfterToolCall?.Invoke(id, tool, toolUse, context, result);
+				if (eventTask != null) await eventTask;
 				return (new ToolResult(result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)

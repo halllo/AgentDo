@@ -51,7 +51,8 @@ namespace AgentDo.OpenAI
 				if (options.Value.LogTask)
 				{
 					logger.LogDebug("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
-					events?.AfterMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
+					var eventTask = events?.AfterMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
+					if (eventTask != null) await eventTask;
 				}
 			}
 
@@ -118,7 +119,8 @@ namespace AgentDo.OpenAI
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogDebug("{Role}: {Text}", completion.Role, text);
-						events?.AfterMessage?.Invoke(completion.Role.ToString(), text);
+						var eventTask = events?.AfterMessage?.Invoke(completion.Role.ToString(), text);
+						if (eventTask != null) await eventTask;
 						context.Text = text;
 					}
 

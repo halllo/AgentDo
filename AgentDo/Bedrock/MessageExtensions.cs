@@ -100,7 +100,8 @@ namespace AgentDo.Bedrock
 						{
 							if (log) Console.WriteLine($"Message started by {start.Role}");
 							responseMessage.Role = start.Role;
-							events?.BeforeMessage?.Invoke(responseMessage.Role, string.Empty);
+							var eventTask = events?.BeforeMessage?.Invoke(responseMessage.Role, string.Empty);
+							if (eventTask != null) await eventTask;
 							break;
 						}
 					case MessageStopEvent stop:
@@ -127,7 +128,8 @@ namespace AgentDo.Bedrock
 								var text = delta.Delta.Text;
 								if (fullResponse.Length == 0) text = text.TrimStart();
 								fullResponse.Append(text);
-								events?.OnMessageDelta?.Invoke(responseMessage.Role, text);
+								var eventTask = events?.OnMessageDelta?.Invoke(responseMessage.Role, text);
+								if (eventTask != null) await eventTask;
 							}
 							break;
 						}

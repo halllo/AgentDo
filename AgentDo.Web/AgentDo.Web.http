@@ -1,0 +1,5 @@
+@AgentDo.Web_HostAddress = http://localhost:5177
+
+GET {{AgentDo.Web_HostAddress}}/generate?query=hello,+what+can+you+do%3F
+
+###

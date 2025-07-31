@@ -2,6 +2,8 @@ using AgentDo;
 using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,10 +42,11 @@ app.MapGet("/generate", async (
 	[FromQuery] string query) =>
 {
 	var response = context.Response;
-	response.Headers.Append("Content-Type", "text/plain");
+	response.Headers.Append("Content-Type", "text/event-stream");
 	async Task stream(string chunk)
 	{
-		await response.WriteAsync(chunk);
+        logger.LogInformation("Streaming {chunk}", JsonSerializer.Serialize(chunk));
+        await response.WriteAsync(chunk);
 		await response.Body.FlushAsync();
 	}
 
@@ -54,18 +57,25 @@ app.MapGet("/generate", async (
 	}
 	else
 	{
+		var stopwatch = Stopwatch.StartNew();
+        logger.LogInformation("Generating response to '{@query}'", query);
 		await agent.Do(
 			task: query,
-			tools: [],
+			tools:
+            [
+                Tool.From([Description("Get data and time")]() => $"{DateTime.Now.ToLongDateString()} {DateTime.Now.ToLongTimeString()}")
+            ],
 			events: new Events
 			{
-				BeforeMessage = (role, message) => stream($"[gray]{role}:[/] "),
+				BeforeMessage = (role, message) => stream($"{role}: "),
 				OnMessageDelta = (role, message) => stream(message),
 				AfterMessage = (role, message) => stream(""),
-				BeforeToolCall = (role, tool, toolUse, context, parameters) => stream($"[gray]{role}:[/] [cyan]{tool.Name}({JsonSerializer.Serialize(parameters)})...[/]"),
-				AfterToolCall = (role, tool, toolUse, context, result) => stream($"[gray]{toolUse.ToolUseId}: {JsonSerializer.Serialize(result)}[/]"),
+				BeforeToolCall = (role, tool, toolUse, context, parameters) => stream($"\n\n{role}: {tool.Name}({JsonSerializer.Serialize(parameters)})\n"),
+				AfterToolCall = (role, tool, toolUse, context, result) => stream($"{toolUse.ToolUseId}: {JsonSerializer.Serialize(result)}\n\n"),
 			});
-	}
+		stopwatch.Stop();
+        logger.LogInformation("Response generated after {stopwatch}", stopwatch.Elapsed);
+    }
 });
 
 app.Run();

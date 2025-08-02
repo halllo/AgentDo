@@ -27,12 +27,18 @@ namespace AgentDo.Bedrock
 		{
 			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
+			var previousUnassociatedToolCalls = promptPreviousMessages.SelectMany(m => m.ToolCalls?.Select(c => new { c.Name, c.Id }) ?? []).Where(tc => !tools.Any(t => t.Name == tc.Name)).ToList();
+			bool isUnassociatedTool(string nameOrId) => previousUnassociatedToolCalls.Any(tc => tc.Name == nameOrId || tc.Id == nameOrId);
 			var previousMessages = promptPreviousMessages
 				.Select(m => new { m, Role = m.Role == ConversationRole.User.Value ? ConversationRole.User : ConversationRole.Assistant, })
 				.Select(m => m.m switch
 				{
-					{ ToolCalls: not null } => m.Role.Says(m.m.Text, m.m.ToolCalls.Select(c => new ToolUseBlock { ToolUseId = c.Id, Name = c.Name, Input = c.Input.ToAmazonJson() })),
-					{ ToolResults: not null } => m.Role.Says(m.m.ToolResults.Select(r => GetAsToolResultMessage(r.Id, r.Output.ToAmazonJson()))),
+					{ ToolCalls: not null } => m.m.ToolCalls.Any(c => isUnassociatedTool(c.Name))
+						? m.Role.Says(m.m.GetTextualRepresentation())
+						: m.Role.Says(m.m.Text, m.m.ToolCalls.Select(c => new ToolUseBlock { ToolUseId = c.Id, Name = c.Name, Input = c.Input.ToAmazonJson() })),
+					{ ToolResults: not null } => m.m.ToolResults.Any(tr => isUnassociatedTool(tr.Id))
+						? m.Role.Says(m.m.GetTextualRepresentation())
+						: m.Role.Says(m.m.ToolResults.Select(r => GetAsToolResultMessage(r.Id, r.Output.ToAmazonJson()))),
 					_ => m.Role.Says(m.m.GetTextualRepresentation()),
 				})
 				.ToList();
@@ -117,7 +123,7 @@ namespace AgentDo.Bedrock
 						messages.Add(ConversationRole.User.Says(toolResults));
 						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
-					pendingToolUses = null; // clear pending tool uses to avoid reprocessing them
+					pendingToolUses = null;
 				}
 				else
 				{

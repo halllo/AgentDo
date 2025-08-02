@@ -2,24 +2,61 @@ using AgentDo;
 using AgentDo.Bedrock;
 using AgentDo.Content;
 using Amazon.BedrockRuntime;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using ModelContextProtocol.Client;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 builder.Services.AddOpenApi();
-builder.Services.AddCors(options =>
-{
-	options.AddDefaultPolicy(policy =>
+//builder.Services.AddCors(options =>
+//{
+//	options.AddDefaultPolicy(policy =>
+//	{
+//		policy.WithOrigins("http://localhost:4200")
+//			  .AllowAnyHeader()
+//			  .AllowAnyMethod();
+//	});
+//});
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+	.AddCookie(options =>
 	{
-		policy.WithOrigins("http://localhost:4200")
-			  .AllowAnyHeader()
-			  .AllowAnyMethod();
+		options.Cookie.Name = $"MyMcpClient.Web";
+		options.Cookie.SameSite = SameSiteMode.Strict;
+		options.ForwardChallenge = OpenIdConnectDefaults.AuthenticationScheme;
+		options.Events.OnRedirectToAccessDenied = new Func<RedirectContext<CookieAuthenticationOptions>, Task>(context =>
+		{
+			context.Response.StatusCode = StatusCodes.Status403Forbidden;
+			return context.Response.CompleteAsync();
+		});
+	})
+	.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, o =>
+	{
+		o.Authority = "https://localhost:5001";
+		o.ClientId = "mcp_server";
+		o.ClientSecret = "secret";
+		o.ResponseType = OpenIdConnectResponseType.Code;
+		o.Scope.Add("openid");
+		o.Scope.Add("profile");
+		o.Scope.Add("verification");
+		o.Scope.Add("notes");
+		o.Scope.Add("admin");
+		o.SaveTokens = true;
+		o.GetClaimsFromUserInfoEndpoint = true;
 	});
-});
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<SetAccessToken>();
+builder.Services.AddHttpClient("mcp").AddHttpMessageHandler<SetAccessToken>().AddAsKeyed();
+
 builder.Services.AddSingleton<IAmazonBedrockRuntime>(sp => new AmazonBedrockRuntimeClient(
 	awsAccessKeyId: config["AWSBedrockAccessKeyId"]!,
 	awsSecretAccessKey: config["AWSBedrockSecretAccessKey"]!,
@@ -34,46 +71,52 @@ builder.Services.Configure<BedrockAgentOptions>(o =>
 
 var app = builder.Build();
 app.MapOpenApi();
-app.UseCors();
+//app.UseCors();
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/tools", async () =>
+
+app.MapGet("/account", (HttpContext context) => Results.Ok(context.User.Claims.Select(c => new { c.Type, c.Value }))).RequireAuthorization();
+
+
+List<SseClientTransportOptions> mcpServers =
+[
+	new() {
+		Name = "Vibe MCP Server",
+		Endpoint = new Uri("https://localhost:7296/"),
+		TransportMode = HttpTransportMode.StreamableHttp
+	}
+];
+app.MapGet("/tools", async (HttpContext httpContext, IAuthenticationService authN, [FromKeyedServices("mcp")] HttpClient http) =>
 {
-	try
+	List<McpClientTool> tools = [];
+	var authNed = await authN.AuthenticateAsync(httpContext, null);
+	if (authNed.Succeeded)
 	{
-		var http = new HttpClient();
-		await using var mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(new()
+		foreach (var server in mcpServers)
 		{
-			Name = "Vibe MCP Server",
-			Endpoint = new Uri("http://localhost:5253/"),
-			TransportMode = HttpTransportMode.StreamableHttp,
-			//OAuth = new()
-			//{
-			//	ClientName = $"ProtectedMcpClient_{DateTime.Now:yyyyMMddHHmmss}",
-			//	RedirectUri = new Uri("http://localhost:1179/callback"),
-			//	AuthorizationRedirectDelegate = HandleAuthorizationUrlAsync,
-			//	Scopes = ["openid", "profile", "verification", "notes", "admin"],
-			//},
-		}, http));
-		var tools = await mcpClient.ListToolsAsync();
-		return Results.Ok(new { tools = tools.Select(t => new { t.Name }) });
+			await using var mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(server, http));
+			tools.AddRange(await mcpClient.ListToolsAsync());
+		}
 	}
-	catch (HttpRequestException e)
-	{
-		return Results.BadRequest($"Could not connect tools: {e.StatusCode}");
-	}
+	return Results.Ok(new { tools = tools.Select(t => new { t.Name, t.Description }) });
 });
 
-AgentResult? agentResult = null;
-app.MapGet("/history", () => Results.Ok(new { agentResult?.Messages }));
+
+string agentResult = "null";
+app.MapGet("/history", () => Results.Ok(new { Messages = JsonSerializer.Deserialize<AgentResult>(agentResult)?.Messages.Select(m => new { m.Role, m.Text, Time = m.Generation?.GeneratedAt }) }));
+
 
 app.MapPost("/generate", async (
 	[FromServices] ILogger<Program> logger,
 	[FromKeyedServices("bedrock")] IAgent agent,
-	HttpContext context,
+	HttpContext httpContext,
+	IAuthenticationService authN, 
+	[FromKeyedServices("mcp")] HttpClient http,
 	[FromBody] GenerateRequest request) =>
 {
-	var response = context.Response;
+	var response = httpContext.Response;
 	response.Headers.Append("Content-Type", "text/event-stream");
 	async Task stream(string chunk)
 	{
@@ -89,13 +132,27 @@ app.MapPost("/generate", async (
 	}
 	else
 	{
+		logger.LogInformation("Loading tools");
+		List<IMcpClient> mcpClients = [];
+		List<McpClientTool> tools = [];
+		var authNed = await authN.AuthenticateAsync(httpContext, null);
+		if (authNed.Succeeded)
+		{
+			foreach (var server in mcpServers)
+			{
+				var mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(server, http));
+				mcpClients.Add(mcpClient);
+				tools.AddRange(await mcpClient.ListToolsAsync());
+			}
+		}
+		
 		var stopwatch = Stopwatch.StartNew();
 		logger.LogInformation("Generating response to '{@query}'", request.Query);
 		var result = await agent.Do(
-			task: new Prompt(request.Query, agentResult),
+			task: new Prompt(request.Query, JsonSerializer.Deserialize<AgentResult>(agentResult)),
 			tools:
 			[
-				Tool.From([Description("Get data and time")]() => $"{DateTime.Now.ToLongDateString()} {DateTime.Now.ToLongTimeString()}")
+				..tools.Where(t => request.UseTools?.Contains(t.Name) ?? false).Select(t => Tool.From(t)),
 			],
 			events: new Events
 			{
@@ -107,10 +164,13 @@ app.MapPost("/generate", async (
 			});
 		stopwatch.Stop();
 		logger.LogInformation("Response generated after {stopwatch}", stopwatch.Elapsed);
-		agentResult = result;
+		agentResult = JsonSerializer.Serialize(result);
+
+		foreach (var mcpClient in mcpClients) await mcpClient.DisposeAsync();
 	}
 });
 
+
 app.Run();
 
-record GenerateRequest(string Query);
+record GenerateRequest(string Query, string[]? UseTools = null);

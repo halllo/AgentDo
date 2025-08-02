@@ -1,5 +1,7 @@
 import { HttpClient, HttpDownloadProgressEvent, HttpEventType, httpResource, HttpResponse } from '@angular/common/http';
-import {Component, computed, effect, inject, resource, ResourceStreamItem, signal, WritableSignal } from '@angular/core';
+import { Component, computed, effect, inject, resource, ResourceStreamItem, signal, WritableSignal } from '@angular/core';
+import { JsonPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-home',
@@ -9,7 +11,7 @@ import {Component, computed, effect, inject, resource, ResourceStreamItem, signa
         <pre class="generated-response">{{ message.role }}: {{ message.text }}</pre>
       }
 
-      @if (this.stream.isLoading() || this.remoteHistory.isLoading()) {
+      @if (this.stream.isLoading() || this.remoteHistory.isLoading() || this.tools.isLoading()) {
         <div class="loading-indicator">Loading...</div>
       }
       @let status = this.stream.status();
@@ -27,7 +29,20 @@ import {Component, computed, effect, inject, resource, ResourceStreamItem, signa
 
       <input type="text" #queryInput placeholder="Enter your query..." (keydown.enter)="this.query.set(queryInput.value); queryInput.value = ''"/>
       <button (click)="this.query.set(queryInput.value); queryInput.value = ''">Generate</button>
-      
+
+      @if (this.tools.value()?.tools?.length) {
+        {{ useTools() | json }}
+        <div class="form-group">
+          <label for="tool">Tools</label>
+          <br>
+          <select class="form-control" id="tool" multiple [(ngModel)]="useTools" name="tools">
+            @for (tool of tools.value()?.tools; track $index) {
+              <option [value]="tool.name">{{ tool.name }} - {{ tool.description }}</option>
+            }
+          </select>
+        </div>
+      }
+
     </div>
   `,
   styles: `
@@ -48,14 +63,16 @@ import {Component, computed, effect, inject, resource, ResourceStreamItem, signa
       word-break: break-word;
     }
   `,
+  imports: [JsonPipe, FormsModule],
 })
 export class Home {
   private http = inject(HttpClient);
 
-  mcpHost = 'https://localhost:7054';
-
-  remoteHistory = httpResource<HistoryDto>(() => `${this.mcpHost}/history`);
-
+  remoteHistory = httpResource<HistoryDto>(() => `/api/history`);
+  
+  tools = httpResource<ToolsDto>(() => `/api/tools`);
+  useTools = signal<string[]>([]);
+  
   query = signal<string>('');
 
   stream = resource({
@@ -72,7 +89,7 @@ export class Home {
       });
       const result = signal<ResourceStreamItem<string>>({ value: "" });
 
-      this.http.post(`${this.mcpHost}/generate`, { query },{
+      this.http.post(`/api/generate`, { query, useTools: this.useTools() },{
         observe: 'events', 
         responseType: 'text', 
         reportProgress: true 
@@ -143,9 +160,14 @@ interface HistoryDto {
 interface MessageDto {
   role: string;
   text: string;
-  generation: GenerationData;
+  time: Date;
 }
 
-interface GenerationData {
-  generatedAt: Date;
+interface ToolsDto {
+  tools: ToolDto[];
+}
+
+interface ToolDto {
+  name: string;
+  description: string;
 }

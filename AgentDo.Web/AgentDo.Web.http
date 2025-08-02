@@ -1,5 +1,17 @@
 @AgentDo.Web_HostAddress = http://localhost:5177
 
-GET {{AgentDo.Web_HostAddress}}/generate?query=hello,+what+can+you+do%3F
+POST {{AgentDo.Web_HostAddress}}/generate
+Content-Type: application/json
+
+{
+  "query": "Hello. What can you do?"
+}
 
 ###
+
+GET {{AgentDo.Web_HostAddress}}/history
+
+
+###
+
+GET {{AgentDo.Web_HostAddress}}/tools

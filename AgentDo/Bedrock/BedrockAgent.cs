@@ -58,7 +58,7 @@ namespace AgentDo.Bedrock
 			}
 
 			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
-			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text())] : []).ToList();
+			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text(), generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow })] : []).ToList();
 
 			var toolConfig = tools.Count == 0 ? null : new ToolConfiguration()
 			{

@@ -1,14 +1,15 @@
-import { HttpClient, HttpDownloadProgressEvent, HttpEventType } from '@angular/common/http';
-import {Component, inject, resource, ResourceStreamItem, signal, WritableSignal} from '@angular/core';
+import { HttpClient, HttpDownloadProgressEvent, HttpEventType, httpResource, HttpResponse } from '@angular/common/http';
+import {Component, computed, effect, inject, resource, ResourceStreamItem, signal, WritableSignal } from '@angular/core';
 
 @Component({
   selector: 'app-home',
   template: `
     <div>
-      <input type="text" #queryInput placeholder="Enter your query..." (keydown.enter)="this.query.set(queryInput.value)"/>
-      <button (click)="this.query.set(queryInput.value)">Generate</button>
+      @for (message of this.history(); track $index) {
+        <pre class="generated-response">{{ message.role }}: {{ message.text }}</pre>
+      }
 
-      @if (this.stream.isLoading()) {
+      @if (this.stream.isLoading() || this.remoteHistory.isLoading()) {
         <div class="loading-indicator">Loading...</div>
       }
       @let status = this.stream.status();
@@ -23,6 +24,10 @@ import {Component, inject, resource, ResourceStreamItem, signal, WritableSignal}
           <pre class="generated-response">{{ value }}</pre>
         }
       }
+
+      <input type="text" #queryInput placeholder="Enter your query..." (keydown.enter)="this.query.set(queryInput.value); queryInput.value = ''"/>
+      <button (click)="this.query.set(queryInput.value); queryInput.value = ''">Generate</button>
+      
     </div>
   `,
   styles: `
@@ -47,6 +52,10 @@ import {Component, inject, resource, ResourceStreamItem, signal, WritableSignal}
 export class Home {
   private http = inject(HttpClient);
 
+  mcpHost = 'https://localhost:7054';
+
+  remoteHistory = httpResource<HistoryDto>(() => `${this.mcpHost}/history`);
+
   query = signal<string>('');
 
   stream = resource({
@@ -63,7 +72,7 @@ export class Home {
       });
       const result = signal<ResourceStreamItem<string>>({ value: "" });
 
-      this.http.get(`https://localhost:7054/generate?query=${query}`, {
+      this.http.post(`${this.mcpHost}/generate`, { query },{
         observe: 'events', 
         responseType: 'text', 
         reportProgress: true 
@@ -74,6 +83,10 @@ export class Home {
             result.set({ value: partial });
             resolve(result);
           }
+          else if (event.type === HttpEventType.Response) {
+            this.streamDone.set({ query, response: event });
+          }
+          window.scrollTo(0,document.body.scrollHeight); //keep scrolled to bottom
         },
         error: (error) => {
           result.set({ error: error });
@@ -87,4 +100,52 @@ export class Home {
       return promise;
     }
   })
+  
+  streamDone = signal<({query: string, response: HttpResponse<string>}) | undefined>(undefined); //because stream resource does not have a property to detect when its done.
+
+  whenNewQuery = effect(() => {
+    const query = this.query();
+    if (query) {
+      this.newHistory.update((history) => [...history, { role: 'user', text: query }])
+    }
+  });
+
+  whenStreamDone = effect(() => {
+    const streamDone = this.streamDone();
+    if (streamDone) {
+      const text = streamDone.response.body?.replace(/^assistant:\s*/, '') ?? '';
+      this.newHistory.update((history) => [...history, { role: 'assistant', text: text }])
+      this.stream.set(''); // Clear the stream after processing
+    }
+  });
+
+  newHistory = signal<HistoryViewModel[]>([]);
+
+  history = computed<HistoryViewModel[]>(() => {
+    const remoteHistory = this.remoteHistory.value();
+    const newHistory = this.newHistory();
+    return [
+      ...remoteHistory?.messages ?? [],
+      ...newHistory
+    ];
+  });
+}
+
+interface HistoryViewModel {
+  role: string;
+  text: string;
+}
+
+interface HistoryDto {
+  messages: MessageDto[];
+}
+
+interface MessageDto {
+  role: string;
+  text: string;
+  generation: GenerationData;
+}
+
+interface GenerationData {
+  generatedAt: Date;
 }

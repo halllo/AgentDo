@@ -1,5 +1,4 @@
 import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { Home } from './home/home';
 
 @Component({
@@ -8,7 +7,7 @@ import { Home } from './home/home';
   template: `
     <main>
       <header class="brand-name">
-        <span>{{ title() }}</span>
+        <h1>{{ title() }}</h1>
       </header>
       <section class="content">
         <app-home></app-home>

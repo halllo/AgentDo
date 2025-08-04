@@ -2,6 +2,7 @@ import { HttpClient, HttpDownloadProgressEvent, HttpEventType, httpResource, Htt
 import { Component, computed, effect, inject, resource, ResourceStreamItem, signal, WritableSignal } from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { streamWithFetch } from './stream';
 
 @Component({
   selector: 'app-home',
@@ -68,6 +69,12 @@ import { FormsModule } from '@angular/forms';
 export class Home {
   private http = inject(HttpClient);
 
+  constructor() {
+    streamWithFetch<{ Index: string }>("/api/stream10").subscribe(data => {
+      console.log("Data from streamWithFetch:", data);
+    });
+  }
+
   remoteHistory = httpResource<HistoryDto>(() => `/api/history`);
   
   tools = httpResource<ToolsDto>(() => `/api/tools`);
@@ -95,6 +102,7 @@ export class Home {
         reportProgress: true 
       }).subscribe({
         next: (event) => {
+          console.log("event", event)
           if (event.type === HttpEventType.DownloadProgress) {
             const partial = (event as HttpDownloadProgressEvent).partialText ?? '';
             result.set({ value: partial });

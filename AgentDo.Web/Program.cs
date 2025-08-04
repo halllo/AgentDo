@@ -112,7 +112,7 @@ app.MapPost("/generate", async (
 	[FromServices] ILogger<Program> logger,
 	[FromKeyedServices("bedrock")] IAgent agent,
 	HttpContext httpContext,
-	IAuthenticationService authN, 
+	IAuthenticationService authN,
 	[FromKeyedServices("mcp")] HttpClient http,
 	[FromBody] GenerateRequest request) =>
 {
@@ -145,7 +145,7 @@ app.MapPost("/generate", async (
 				tools.AddRange(await mcpClient.ListToolsAsync());
 			}
 		}
-		
+
 		var stopwatch = Stopwatch.StartNew();
 		logger.LogInformation("Generating response to '{@query}'", request.Query);
 		var result = await agent.Do(
@@ -170,6 +170,24 @@ app.MapPost("/generate", async (
 	}
 });
 
+byte[] newLineBytes = new System.Text.UTF8Encoding().GetBytes(Environment.NewLine);
+app.MapGet("/stream10", async (HttpResponse response, CancellationToken cancellationToken) =>
+{
+	try
+	{
+		response.ContentType = "application/x-ndjson";
+		foreach (var index in Enumerable.Range(1, 10))
+		{
+			var documentJson = JsonSerializer.SerializeToUtf8Bytes(new { Index = index });
+			await response.Body.WriteAsync(documentJson, cancellationToken);
+			await response.Body.WriteAsync(newLineBytes, cancellationToken);
+			await response.Body.FlushAsync();
+			await Task.Delay(TimeSpan.FromSeconds(1));
+		}
+	}
+	catch (OperationCanceledException)	{ }
+	return Results.Empty;
+});
 
 app.Run();
 

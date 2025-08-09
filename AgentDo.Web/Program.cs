@@ -118,10 +118,11 @@ app.MapPost("/generate", async (
 {
 	var response = httpContext.Response;
 	response.Headers.Append("Content-Type", "text/event-stream");
-	async Task stream(string chunk)
+	async Task stream(string chunk, CancellationToken cancellationToken = default)
 	{
-		logger.LogInformation("Streaming {chunk}", JsonSerializer.Serialize(chunk));
-		await response.WriteAsync(chunk);
+		logger.LogDebug("Streaming {chunk}", JsonSerializer.Serialize(chunk));
+		var serializedChunk = JsonSerializer.SerializeToUtf8Bytes(chunk);//preventing net::ERR_INCOMPLETE_CHUNKED_ENCODING
+		await response.Body.WriteAsync(serializedChunk, cancellationToken);
 		await response.Body.FlushAsync();
 	}
 
@@ -168,25 +169,6 @@ app.MapPost("/generate", async (
 
 		foreach (var mcpClient in mcpClients) await mcpClient.DisposeAsync();
 	}
-});
-
-byte[] newLineBytes = new System.Text.UTF8Encoding().GetBytes(Environment.NewLine);
-app.MapGet("/stream10", async (HttpResponse response, CancellationToken cancellationToken) =>
-{
-	try
-	{
-		response.ContentType = "application/x-ndjson";
-		foreach (var index in Enumerable.Range(1, 10))
-		{
-			var documentJson = JsonSerializer.SerializeToUtf8Bytes(new { Index = index });
-			await response.Body.WriteAsync(documentJson, cancellationToken);
-			await response.Body.WriteAsync(newLineBytes, cancellationToken);
-			await response.Body.FlushAsync();
-			await Task.Delay(TimeSpan.FromSeconds(1));
-		}
-	}
-	catch (OperationCanceledException)	{ }
-	return Results.Empty;
 });
 
 app.Run();

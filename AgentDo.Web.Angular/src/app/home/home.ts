@@ -70,9 +70,7 @@ export class Home {
   private http = inject(HttpClient);
 
   constructor() {
-    streamWithFetch<{ Index: string }>("/api/stream10").subscribe(data => {
-      console.log("Data from streamWithFetch:", data);
-    });
+    
   }
 
   remoteHistory = httpResource<HistoryDto>(() => `/api/history`);
@@ -105,7 +103,8 @@ export class Home {
           console.log("event", event)
           if (event.type === HttpEventType.DownloadProgress) {
             const partial = (event as HttpDownloadProgressEvent).partialText ?? '';
-            result.set({ value: partial });
+            const decoded = decodeEventStream(partial);
+            result.set({ value: decoded });
             resolve(result);
           }
           else if (event.type === HttpEventType.Response) {
@@ -138,7 +137,9 @@ export class Home {
   whenStreamDone = effect(() => {
     const streamDone = this.streamDone();
     if (streamDone) {
-      const text = streamDone.response.body?.replace(/^assistant:\s*/, '') ?? '';
+      const streamed = streamDone.response.body ?? '';
+      const decoded = decodeEventStream(streamed);
+      const text = decoded.replace(/^assistant:\s*/, '');
       this.newHistory.update((history) => [...history, { role: 'assistant', text: text }])
       this.stream.set(''); // Clear the stream after processing
     }
@@ -179,3 +180,15 @@ interface ToolDto {
   name: string;
   description: string;
 }
+
+function decodeEventStream(eventStream: string) {
+  const decodedEventStream = eventStream
+    .split('""')
+    .map(part => part.replace(/^"+|"+$/g, ''))
+    .map(part => `"${part}"`)
+    .map(part => JSON.parse(part))
+    .join('');
+  console.debug("Decoded eventStream:", decodedEventStream);
+  return decodedEventStream;
+}
+

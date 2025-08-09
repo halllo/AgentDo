@@ -1,6 +1,12 @@
 import { Observable } from "rxjs";
 
-// taken from https://medium.com/we-code/angular-and-json-streaming-388f33652102
+
+/* Taken from https://medium.com/we-code/angular-and-json-streaming-388f33652102.
+ * Use it like this:
+ *   streamWithFetch<{ Index: string }>("/api/stream10").subscribe(data => {
+ *     console.log("Data from streamWithFetch:", data);
+ *   });
+ */
 export function streamWithFetch<T>(url: string) {
   return new Observable<T>(observer => {
     fetch(url).then(res => {

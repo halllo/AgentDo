@@ -12,16 +12,19 @@ namespace AgentDo
 		public static ToolDefinition GetToolDefinition(Tool tool)
 		{
 			var method = tool.Delegate.GetMethodInfo();
-			var methodDescription = method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description ?? tool.Name;
+			var description = 
+				   (!string.IsNullOrWhiteSpace(tool.Description) ? tool.Description : null) 
+				?? method.GetCustomAttributes<DescriptionAttribute>().SingleOrDefault()?.Description 
+				?? tool.Name;
 
 			if (tool.Schema != null)
 			{
-				return new ToolDefinition(tool.Name, methodDescription, tool.Schema);
+				return new ToolDefinition(tool.Name, description, tool.Schema);
 			}
 			else
 			{
 				JsonObject schema = GetInputsAsSchema(method);
-				return new ToolDefinition(tool.Name, methodDescription, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
+				return new ToolDefinition(tool.Name, description, JsonDocument.Parse(schema.ToJsonString(JsonSchemaExtensions.OutputOptions)));
 			}
 		}
 

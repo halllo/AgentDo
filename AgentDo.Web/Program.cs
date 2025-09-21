@@ -27,7 +27,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
 	.AddCookie(options =>
 	{
-		options.Cookie.Name = $"MyMcpClient.Web";
+		options.Cookie.Name = $"AgentDo.Web";
 		options.Cookie.SameSite = SameSiteMode.Strict;
 		options.ForwardChallenge = OpenIdConnectDefaults.AuthenticationScheme;
 		options.Events.OnRedirectToAccessDenied = new Func<RedirectContext<CookieAuthenticationOptions>, Task>(context =>
@@ -84,8 +84,8 @@ List<SseClientTransportOptions> mcpServers =
 [
 	new() {
 		Name = "Vibe MCP Server",
-		Endpoint = new Uri("https://localhost:7296/"),
-		TransportMode = HttpTransportMode.StreamableHttp
+		Endpoint = new Uri("http://localhost:5253/bot"),
+		TransportMode = HttpTransportMode.StreamableHttp,
 	}
 ];
 app.MapGet("/tools", async (HttpContext httpContext, IAuthenticationService authN, [FromKeyedServices("mcp")] HttpClient http) =>

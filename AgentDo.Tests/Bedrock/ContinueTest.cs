@@ -11,7 +11,7 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class ContinueTest
 	{
 		[TestMethodWithDI]
-		public async Task ChatSuspendResumeChat(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		public async Task ContinueChat(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var agent = new BedrockAgent(
 				bedrock: bedrock,
@@ -51,6 +51,42 @@ namespace AgentDo.Tests.Bedrock
 
 			Console.WriteLine("Unregister messages:\n" + JsonSerializer.Serialize(unregisterResult.Messages, new JsonSerializerOptions { WriteIndented = true }));
 			Assert.AreEqual("Manuel Naujoks", unregisteredName);
+		}
+
+		[TestMethodWithDI]
+		public async Task SuspendToolAndResume(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			var agent = new BedrockAgent(
+				bedrock: bedrock,
+				logger: loggerFactory.CreateLogger<BedrockAgent>(),
+				options: Options.Create(new BedrockAgentOptions
+				{
+					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+					Temperature = 0.0F
+				}));
+
+			var suspended = await agent.Do(
+				task: "Whats the weather?",
+				tools:
+				[
+					Tool.From([Description("Get wether.")] (Tool.Context context) =>
+					{
+						context.Suspend();
+					}),
+				]);
+
+			var resumed = await agent.Do(
+				task: new Content.Prompt(string.Empty, suspended),
+				tools:
+				[
+					Tool.From([Description("Get wether.")] (Tool.Context context) =>
+					{
+						return "cloudy";
+					}),
+				]);
+
+			Console.WriteLine("Messages:\n" + JsonSerializer.Serialize(resumed.Messages, new JsonSerializerOptions { WriteIndented = true }));
+			Assert.Contains("cloudy", resumed.Messages.Last().Text);
 		}
 	}
 }

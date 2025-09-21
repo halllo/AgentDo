@@ -47,7 +47,7 @@ namespace AgentDo.Tests.Bedrock
 			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
 			Assert.IsNull(registeredPerson.Address!.Street);
 		}
-		
+
 		[TestMethodWithDI]
 		public async Task MEAIToolUseVoid(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{

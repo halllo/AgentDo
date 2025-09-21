@@ -12,6 +12,8 @@ namespace AgentDo
 	{
 		public string Name { get; private set; }
 
+		public string? Description { get; private set; }
+
 		public Delegate Delegate { get; private set; }
 
 		public bool RequireApproval { get; private set; }
@@ -20,9 +22,10 @@ namespace AgentDo
 
 		internal JsonDocument? Schema { get; private set; }
 
-		private Tool(string name, Delegate tool, bool logInputsAndOutputs, bool requireApproval, JsonDocument? schema)
+		private Tool(string name, string? description, Delegate tool, bool logInputsAndOutputs, bool requireApproval, JsonDocument? schema)
 		{
 			this.Name = name;
+			this.Description = description;
 			this.Delegate = tool;
 			this.LogInputsAndOutputs = logInputsAndOutputs;
 			this.RequireApproval = requireApproval;
@@ -32,7 +35,7 @@ namespace AgentDo
 		public static Tool From(Delegate tool, [CallerArgumentExpression(nameof(tool))] string toolName = "", bool logInputsAndOutputs = true, bool requireApproval = false)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, logInputsAndOutputs, requireApproval, null);
+			return new Tool(actualToolName, null, tool, logInputsAndOutputs, requireApproval, null);
 		}
 
 		public static Tool From(JsonDocument schema, Action<JsonDocument> tool, [CallerArgumentExpression(nameof(tool))] string toolName = "") => From(schema, (Delegate)tool, toolName);
@@ -42,13 +45,14 @@ namespace AgentDo
 		public static Tool From(JsonDocument schema, Delegate tool, string toolName = "", bool logInputsAndOutputs = false)
 		{
 			string actualToolName = GetToolName(tool, toolName);
-			return new Tool(actualToolName, tool, logInputsAndOutputs, false, schema);
+			return new Tool(actualToolName, null, tool, logInputsAndOutputs, false, schema);
 		}
 
 		public static Tool From(AIFunction aiFunction, bool logInputsAndOutputs = true, bool requireApproval = false)
 		{
 			return new Tool(
 				name: aiFunction.Name,
+				description: aiFunction.Description,
 				tool: async (JsonObject i) =>
 				{
 					var arguments = i.Deserialize<Dictionary<string, object?>>();
@@ -94,6 +98,12 @@ namespace AgentDo
 			public string? Text { get; internal set; }
 
 			public IReadOnlyList<Message> GetMessages() => this.messages;
+
+			public void Suspend()
+			{
+				Cancelled = true;
+				RememberToolResultWhenCancelled = false;
+			}
 		}
 	}
 }

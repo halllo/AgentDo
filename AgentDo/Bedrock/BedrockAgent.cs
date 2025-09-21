@@ -46,7 +46,9 @@ namespace AgentDo.Bedrock
 			var images = task.Images.Select(i => i.ForBedrock()).ToList();
 			var documents = task.Documents.Select(d => d.ForBedrock()).ToList();
 
-			var taskMessage = pendingToolUses == null
+			var resumableToolUses = previousMessages.LastOrDefault()?.ToolsUse().Where(t => !(pendingToolUses?.Uses.Any(p => p.ToolUseId == t.ToolUseId) ?? false))				.ToArray() ?? [];
+
+			var taskMessage = pendingToolUses == null && !resumableToolUses.Any()
 				? ConversationRole.User.Says(
 					text: task.Text,
 					images: images,
@@ -80,6 +82,53 @@ namespace AgentDo.Bedrock
 			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
+				if (resumableToolUses.Any())
+				{
+					var readyResumableToolUses = resumableToolUses.Select(toolUse => new ToolUsing.ToolUse
+					{
+						ToolUseId = toolUse.ToolUseId,
+						ToolName = toolUse.Name,
+						ToolInput = toolUse.Input.FromAmazonJson(),
+						ToolResult = null,
+					});
+					var toolResults = new List<ToolResultBlock>();
+
+					foreach (var resumableToolUse in readyResumableToolUses)
+					{
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, resumableToolUse, previousMessages.Last().Role, context, events, logger, cancellationToken: cancellationToken);
+						if (toolResult == null && requiresApproval != null)
+						{
+							return new AgentResult
+							{
+								Agent = this,
+								Task = task,
+								Tools = tools,
+								Messages = resultMessages,
+								PendingToolUses = pendingToolUses,
+							};
+						}
+						else if (toolResult != null)
+						{
+							resumableToolUse.ToolResult = JsonSerializer.Serialize(toolResult.Result);
+
+							var toolResultMessage = GetAsToolResultMessage(resumableToolUse.ToolUseId, toolResult.Result);
+							toolResults.Add(toolResultMessage);
+
+							if (context.Cancelled)
+							{
+								keepConversing = false;
+								break;
+							}
+						}
+						else throw new ArgumentException("No tool result and no approval requirement.");
+					}
+
+					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+					{
+						messages.Add(ConversationRole.User.Says(toolResults));
+						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
+					}
+				}
 				if (pendingToolUses != null)
 				{
 					var toolResults = pendingToolUses.Uses

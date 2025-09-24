@@ -4,12 +4,13 @@
       "commandName": "Project",
       //"commandLineArgs": "bedrock-models"
       //"commandLineArgs": "task \"Explain to me how you work and what you can do.\""
-      "commandLineArgs": "task \"Explain to me how you work and what you can do.\" --streaming"
+      //"commandLineArgs": "task \"Explain to me how you work and what you can do.\" --streaming"
       //"commandLineArgs": "task \"List all documents (pdfs only) in 'C:\\Users\\manue\\Downloads\\Inbox'\"",
       //"commandLineArgs": "task \"List all documents (pdfs only) in 'C:\\Users\\manue\\Downloads\\Inbox'\" --streaming"
       //"commandLineArgs": "task \"Help me deal the documents (pdfs only) in 'C:\\Users\\manue\\Downloads\\Inbox'\""
       //"commandLineArgs": "classify --config classification.json \"C:\\Users\\manue\\Downloads\\Inbox\\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF\""
       //"commandLineArgs": "mcp \"I would like to register Manuel Naujoks from Karlsruhe.\""
+      "commandLineArgs": "chat \"You are a friendly agent that uses as many emojis as possible.\""
     }
   }
 }

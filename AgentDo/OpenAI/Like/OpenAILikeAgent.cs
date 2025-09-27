@@ -62,7 +62,7 @@ namespace AgentDo.OpenAI.Like
 				if (!string.IsNullOrWhiteSpace(text))
 				{
 					logger.LogDebug("{Role}: {Text}", completion.Message.Role, text);
-					var eventTask = events?.AfterMessage?.Invoke(completion.Message.Role, text);
+					var eventTask = events?.AfterMessage?.Invoke(completion.Message.Role, text!);
 					if (eventTask != null) await eventTask;
 					context.Text = text;
 				}
@@ -98,9 +98,9 @@ namespace AgentDo.OpenAI.Like
 										PendingToolUses = new PendingToolUsesContext
 										{
 											Role = completion.Message.Role.ToString(),
-											Text = text,
+											Text = text ?? string.Empty,
 											Uses = pendingToolUses,
-											GenerationData = null,
+											GenerationData = null!,
 										},
 									};
 								}

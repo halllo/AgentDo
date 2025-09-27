@@ -80,7 +80,7 @@ app.UseAuthorization();
 app.MapGet("/account", (HttpContext context) => Results.Ok(context.User.Claims.Select(c => new { c.Type, c.Value }))).RequireAuthorization();
 
 
-List<SseClientTransportOptions> mcpServers =
+List<HttpClientTransportOptions> mcpServers =
 [
 	new() {
 		Name = "Vibe MCP Server",
@@ -96,7 +96,7 @@ app.MapGet("/tools", async (HttpContext httpContext, IAuthenticationService auth
 	{
 		foreach (var server in mcpServers)
 		{
-			await using var mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(server, http));
+			await using var mcpClient = await McpClient.CreateAsync(new HttpClientTransport(server, http));
 			tools.AddRange(await mcpClient.ListToolsAsync());
 		}
 	}
@@ -134,14 +134,14 @@ app.MapPost("/generate", async (
 	else
 	{
 		logger.LogInformation("Loading tools");
-		List<IMcpClient> mcpClients = [];
+		List<McpClient> mcpClients = [];
 		List<McpClientTool> tools = [];
 		var authNed = await authN.AuthenticateAsync(httpContext, null);
 		if (authNed.Succeeded)
 		{
 			foreach (var server in mcpServers)
 			{
-				var mcpClient = await McpClientFactory.CreateAsync(new SseClientTransport(server, http));
+				var mcpClient = await McpClient.CreateAsync(new HttpClientTransport(server, http));
 				mcpClients.Add(mcpClient);
 				tools.AddRange(await mcpClient.ListToolsAsync());
 			}

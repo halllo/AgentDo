@@ -42,5 +42,33 @@ namespace AgentDo
 			var newResult = await Agent.Do(continueTask, Tools);
 			return newResult;
 		}
+
+		public AgentResult KeepOnly(int maxMessages)
+		{
+			if (Messages.Count <= maxMessages)
+			{
+				return this;
+			}
+
+			int skip = Messages.Count - maxMessages;
+			var reduced = new AgentResult
+			{
+				Agent = Agent,
+				Task = Task,
+				Tools = Tools,
+				PendingToolUses = PendingToolUses,
+				Messages = Messages
+					.Where((m, index) => 
+						index >= skip //skip the first messages (false)...
+						|| 
+						(string.Equals(m.Role, "system", StringComparison.InvariantCultureIgnoreCase) //...unless its a system message...
+							? (skip == skip++) //...then take it (evaluates to true) and at the same time prepare to skip one more non-system message.
+							: false)
+						)
+					.SkipWhile(m => m.ToolResults != null)
+					.ToList(),
+			};
+			return reduced;
+		}
 	}
 }

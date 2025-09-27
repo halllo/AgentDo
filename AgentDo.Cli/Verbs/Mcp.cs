@@ -22,7 +22,7 @@ namespace AgentDo.Cli.Verbs
 				return new { status = "registered" };
 			});
 
-			await using var mcpClient = await McpClientFactory.CreateAsync(new StdioClientTransport(new()
+			await using var mcpClient = await McpClient.CreateAsync(new StdioClientTransport(new()
 			{
 				Name = "Time MCP Server",
 				Command = @"C:\Projects\McpExperiments\MyMCPServer.Stdio\bin\Debug\net9.0\MyMCPServer.Stdio.exe",

@@ -91,8 +91,8 @@ static IHostBuilder CreateHostBuilder()
 			services.Configure<BedrockAgentOptions>(o =>
 			{
 				//o.ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0";
-				o.ModelId = "anthropic.claude-3-7-sonnet-20250219-v1:0";
-				//o.ModelId = "eu.anthropic.claude-sonnet-4-20250514-v1:0";
+				//o.ModelId = "eu.anthropic.claude-3-7-sonnet-20250219-v1:0";
+				o.ModelId = "eu.anthropic.claude-sonnet-4-20250514-v1:0";
 			});
 		});
 }

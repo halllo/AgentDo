@@ -6,7 +6,7 @@ namespace AgentDo.Tests
 	[TestClass]
 	public sealed class StringToAmountConverterTest
 	{
-		[DataTestMethod]
+		[TestMethod]
 		[DataRow("1,99", 1.99)]
 		[DataRow("1.99", 1.99)]
 		[DataRow("-1,99", -1.99)]

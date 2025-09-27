@@ -16,7 +16,7 @@ namespace AgentDo.Tests.Bedrock
 		[TestMethodWithDI]
 		public async Task BedrockAgentWithDocumentAndToolInvocation(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 
 			using var document = Document.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF"));
 			CreditCardStatement? creditCardStatement = default;

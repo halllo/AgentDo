@@ -13,7 +13,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var registrations = new List<JsonDocument>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			var messages = await agent.Do(
 				task: "Its March 2025. I would like to register Manuel Naujoks (born in September 1986) from Karlsruhe.",
 				tools:

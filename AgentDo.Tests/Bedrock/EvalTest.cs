@@ -21,32 +21,24 @@ namespace AgentDo.Tests.Bedrock
 					Temperature = 0.0F
 				}));
 
-			Task<Evaluation> evaluate(Message[] conversation) => judge.Eval<Evaluation>($"Did the assistant's answer address the user's question? Conversation: {JsonSerializer.Serialize(conversation)}");
+			async Task evaluate(string question, Message[] conversation, bool affirmative)
 			{
-				var eval = await evaluate(
-				[
-					new Message { Role = "user", Text = "Whats the weather today?" },
-					new Message { Role = "assistant", Text = "It is cloudy and 15 degrees Celsius." },
-				]);
-				eval.Assert(affirmative: true);
+				var eval = await judge.Eval($"{question} Conversation: {JsonSerializer.Serialize(conversation)}");
+				Console.WriteLine(JsonSerializer.Serialize(eval, new JsonSerializerOptions { WriteIndented = true }));
+				Assert.AreEqual(affirmative, eval.Affirmative, eval.Explanation);
 			}
-			{
-				var eval = await evaluate(
-				[
-					new Message { Role = "user", Text = "Whats the weather today?" },
-					new Message { Role = "assistant", Text = "Today is Sunday." },
-				]);
-				eval.Assert(affirmative: false);
-			}
-		}
 
-		record Evaluation(bool Affirmative, string Explanation)
-		{
-			public void Assert(bool affirmative)
-			{
-				Console.WriteLine(JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-				Microsoft.VisualStudio.TestTools.UnitTesting.Assert.AreEqual(affirmative, Affirmative, Explanation);
-			}
+			await evaluate("Did the assistant's answer address the user's question?",
+			[
+				new Message { Role = "user", Text = "Whats the weather today?" },
+				new Message { Role = "assistant", Text = "It is cloudy and 15 degrees Celsius." },
+			], affirmative: true);
+
+			await evaluate("Did the assistant's answer address the user's question?",
+			[
+				new Message { Role = "user", Text = "Whats the weather today?" },
+				new Message { Role = "assistant", Text = "Today is Sunday." },
+			], affirmative: false);
 		}
 	}
 }

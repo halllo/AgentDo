@@ -12,7 +12,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -33,7 +33,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -53,7 +53,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -73,7 +73,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -94,7 +94,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -114,7 +114,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -134,7 +134,7 @@ namespace AgentDo.Tests.Bedrock
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory);
+			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:

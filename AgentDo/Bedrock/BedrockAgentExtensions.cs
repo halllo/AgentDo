@@ -13,7 +13,7 @@ namespace AgentDo.Bedrock
 				logger: loggerFactory.CreateLogger<BedrockAgent>(),
 				options: Options.Create(new BedrockAgentOptions
 				{
-					ModelId = modelId ?? "anthropic.claude-3-5-sonnet-20240620-v1:0",
+					ModelId = modelId ?? throw new ArgumentException("No ModelId provided."),
 					Temperature = 0.0F
 				}));
 		}

@@ -35,7 +35,10 @@ namespace AgentDo.Bedrock
 				{
 					{ ToolCalls: not null } => m.m.ToolCalls.Any(c => isUnassociatedTool(c.Name))
 						? m.Role.Says(m.m.GetTextualRepresentation())
-						: m.Role.Says(m.m.Text, m.m.ToolCalls.Select(c => new ToolUseBlock { ToolUseId = c.Id, Name = c.Name, Input = c.Input.ToAmazonJson() })),
+						: m.Role.Says(
+							text: m.m.Text,
+							reason: m.m.Reason == null ? null : new ReasoningContentBlock { ReasoningText = new ReasoningTextBlock { Text = m.m.Reason.Text, Signature = m.m.Reason.Signature } },
+							toolUses: m.m.ToolCalls.Select(c => new ToolUseBlock { ToolUseId = c.Id, Name = c.Name, Input = c.Input.ToAmazonJson() })),
 					{ ToolResults: not null } => m.m.ToolResults.Any(tr => isUnassociatedTool(tr.Id))
 						? m.Role.Says(m.m.GetTextualRepresentation())
 						: m.Role.Says(m.m.ToolResults.Select(r => GetAsToolResultMessage(r.Id, r.Output.ToAmazonJson()))),
@@ -46,7 +49,16 @@ namespace AgentDo.Bedrock
 			var images = task.Images.Select(i => i.ForBedrock()).ToList();
 			var documents = task.Documents.Select(d => d.ForBedrock()).ToList();
 
-			var resumableToolUses = previousMessages.LastOrDefault()?.ToolsUse().Where(t => !(pendingToolUses?.Uses.Any(p => p.ToolUseId == t.ToolUseId) ?? false))				.ToArray() ?? [];
+			var resumableToolUses = previousMessages.LastOrDefault()?.ToolsUse()
+				.Where(t => !(pendingToolUses?.Uses.Any(p => p.ToolUseId == t.ToolUseId) ?? false))
+				.Select(t => new ToolUsing.ToolUse
+				{
+					ToolUseId = t.ToolUseId,
+					ToolName = t.Name,
+					ToolInput = t.Input.FromAmazonJson(),
+					ToolResult = null,
+				})
+				.ToList() ?? [];
 
 			var taskMessage = pendingToolUses == null && !resumableToolUses.Any()
 				? ConversationRole.User.Says(
@@ -75,25 +87,18 @@ namespace AgentDo.Bedrock
 
 			var inferenceConfig = new InferenceConfiguration()
 			{
-				Temperature = options.Value.Temperature ?? 0.0F
+				Temperature = options.Value.ReasoningBudget > 0 ? 1.0F : options.Value.Temperature ?? 0.0F
 			};
 
 			bool keepConversing = true;
 			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
-				if (resumableToolUses.Any())
+				var remainingResumableToolUses = resumableToolUses.Where(t => t.ToolResult == null);
+				if (remainingResumableToolUses.Any())
 				{
-					var readyResumableToolUses = resumableToolUses.Select(toolUse => new ToolUsing.ToolUse
-					{
-						ToolUseId = toolUse.ToolUseId,
-						ToolName = toolUse.Name,
-						ToolInput = toolUse.Input.FromAmazonJson(),
-						ToolResult = null,
-					});
 					var toolResults = new List<ToolResultBlock>();
-
-					foreach (var resumableToolUse in readyResumableToolUses)
+					foreach (var resumableToolUse in remainingResumableToolUses)
 					{
 						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, resumableToolUse, previousMessages.Last().Role, context, events, logger, cancellationToken: cancellationToken);
 						if (toolResult == null && requiresApproval != null)
@@ -126,7 +131,7 @@ namespace AgentDo.Bedrock
 					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
-						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
+						resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
 				}
 				if (pendingToolUses != null)
@@ -170,13 +175,21 @@ namespace AgentDo.Bedrock
 					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
-						resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
+						resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
 					pendingToolUses = null;
 				}
 				else
 				{
 					var converseDurationStopwatch = Stopwatch.StartNew();
+					var reasoningConfig = options.Value.ReasoningBudget > 0 ? Amazon.Runtime.Documents.Document.FromObject(new
+					{
+						thinking = new Dictionary<string, object>
+						{
+							{"type", "enabled"},
+							{"budget_tokens", options.Value.ReasoningBudget},
+						}
+					}) : default;
 
 					Amazon.BedrockRuntime.Model.Message responseMessage;
 					TokenUsage tokenUsage;
@@ -186,6 +199,7 @@ namespace AgentDo.Bedrock
 						var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 						{
 							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+							AdditionalModelRequestFields = reasoningConfig,
 							Messages = messages,
 							ToolConfig = toolConfig,
 							InferenceConfig = inferenceConfig,
@@ -199,6 +213,7 @@ namespace AgentDo.Bedrock
 						{
 							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
 							Messages = messages,
+							AdditionalModelRequestFields = reasoningConfig,
 							ToolConfig = toolConfig,
 							InferenceConfig = inferenceConfig,
 						}, cancellationToken);
@@ -221,6 +236,8 @@ namespace AgentDo.Bedrock
 					messages.Add(responseMessage);
 
 					var text = responseMessage.Text();
+					var reason = responseMessage.Reason().Serialize();
+					context.Reason = reason?.Text;
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogDebug("{Role}: {Text}", responseMessage.Role, text);
@@ -243,7 +260,7 @@ namespace AgentDo.Bedrock
 							})
 							.ToList();
 
-						resultMessages.Add(new Message(responseMessage.Role, text,
+						resultMessages.Add(new Message(responseMessage.Role, text, reason,
 							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput })],
 							toolResults: null,
 							generationData: generationData));
@@ -266,6 +283,7 @@ namespace AgentDo.Bedrock
 									{
 										Role = responseMessage.Role,
 										Text = text,
+										Reason = reason,
 										Uses = toolUses,
 										GenerationData = generationData,
 									},
@@ -290,13 +308,13 @@ namespace AgentDo.Bedrock
 						if (!context.Cancelled || context.RememberToolResultWhenCancelled)
 						{
 							messages.Add(ConversationRole.User.Says(toolResults));
-							resultMessages.Add(new Message(ConversationRole.User, "", null, [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
+							resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 						}
 					}
 					else
 					{
 						keepConversing = false;
-						resultMessages.Add(new Message(responseMessage.Role, text, null, null, generationData));
+						resultMessages.Add(new Message(responseMessage.Role, text, reason, generationData: generationData));
 					}
 				}
 			}

@@ -96,6 +96,7 @@ namespace AgentDo
 			public bool Cancelled { get; set; }
 			public bool RememberToolResultWhenCancelled { get; set; }
 			public string? Text { get; internal set; }
+			public string? Reason { get; internal set; }
 
 			public IReadOnlyList<Message> GetMessages() => this.messages;
 

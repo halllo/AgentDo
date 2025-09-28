@@ -6,7 +6,7 @@ namespace AgentDo.Bedrock
 {
 	public static class BedrockAgentExtensions
 	{
-		public static IAgent AsAgent(this IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory, string modelId)
+		public static IAgent AsAgent(this IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory, string modelId, int? reasoningBudget = null)
 		{
 			return new BedrockAgent(
 				bedrock: bedrock,
@@ -14,6 +14,7 @@ namespace AgentDo.Bedrock
 				options: Options.Create(new BedrockAgentOptions
 				{
 					ModelId = modelId,
+					ReasoningBudget = reasoningBudget,
 					Temperature = 0.0F
 				}));
 		}

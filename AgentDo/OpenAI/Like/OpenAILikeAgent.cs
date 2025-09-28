@@ -83,7 +83,7 @@ namespace AgentDo.OpenAI.Like
 							foreach (var toolCall in pendingToolUses)
 							{
 								cancellationToken.ThrowIfCancellationRequested();
-								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput }], null));
+								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, toolCalls: [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput }], toolResults: null));
 
 								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, events, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
 
@@ -108,7 +108,7 @@ namespace AgentDo.OpenAI.Like
 								{
 									var toolResultMessage = GetAsToolResultMessage(toolCall.ToolUseId, toolResult);
 									messages.Add(toolResultMessage);
-									resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, null, [new Message.ToolResult { Id = toolCall.ToolUseId, Output = toolResultMessage.Content! }]));
+									resultMessages.Add(new(toolResultMessage.Role, text ?? string.Empty, toolResults: [new Message.ToolResult { Id = toolCall.ToolUseId, Output = toolResultMessage.Content! }]));
 								}
 								else throw new ArgumentException("No tool result and no approval requirement.");
 							}

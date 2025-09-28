@@ -4,6 +4,7 @@
 	{
 		public OnMessage? BeforeMessage { get; set; }
 		public OnMessage? OnMessageDelta { get; set; }
+		public OnMessage? OnReasonDelta { get; set; }
 		public OnMessage? AfterMessage { get; set; }
 		public BeforeToolCall? BeforeToolCall { get; set; }
 		public AfterToolCall? AfterToolCall { get; set; }

@@ -12,6 +12,17 @@ namespace AgentDo.Bedrock
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [.. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, ReasoningContentBlock? reason, params IEnumerable<ToolUseBlock> toolUses) => new()
+		{
+			Role = role,
+			Content = [
+				.. reason == null
+					? Array.Empty<ContentBlock>()
+					: [new ContentBlock { ReasoningContent = reason }],
+				new ContentBlock { Text = text },
+				.. toolUses.Select(tu => new ContentBlock { ToolUse = tu })
+			]
+		};
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [.. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ToolResultBlock> toolResults) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. toolResults.Select(tr => new ContentBlock { ToolResult = tr })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text) => Says(role, text, [], []);
@@ -20,6 +31,9 @@ namespace AgentDo.Bedrock
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, IEnumerable<ImageBlock> images, IEnumerable<DocumentBlock> documents) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. images.Select(i => new ContentBlock { Image = i }), .. documents.Select(d => new ContentBlock { Document = d })] };
 
 		public static string Text(this Amazon.BedrockRuntime.Model.Message message) => string.Concat(message.Content.Select(c => c.Text));
+		public static ReasoningTextBlock? Reason(this Amazon.BedrockRuntime.Model.Message message) => message.Content.Select(c => c.ReasoningContent?.ReasoningText).FirstOrDefault(r => r != null);
+		public static Message.Reasoning? Serialize(this ReasoningTextBlock? reasoning) => reasoning == null ? null : new Message.Reasoning { Text = reasoning.Text, Signature = reasoning.Signature };
+
 		public static IEnumerable<ToolUseBlock> ToolsUse(this Amazon.BedrockRuntime.Model.Message message)
 		{
 			var toolUses = message.Content.Select(c => c.ToolUse).Where(t => t != null);
@@ -83,6 +97,7 @@ namespace AgentDo.Bedrock
 		public static async Task<(Amazon.BedrockRuntime.Model.Message, TokenUsage, StopReason)> ToMessage(this ConverseStreamResponse response, Events? events = null, bool log = false)
 		{
 			var fullResponse = new StringBuilder();
+			var reasoningResponse = new StringBuilder();
 			var currentContentBlockStart = default(ContentBlockStart?);
 			var responseMessage = new Amazon.BedrockRuntime.Model.Message
 			{
@@ -119,11 +134,11 @@ namespace AgentDo.Bedrock
 					case ContentBlockDeltaEvent delta:
 						{
 							if (log) Console.WriteLine($"Content block {delta.ContentBlockIndex} delta {JsonSerializer.Serialize(delta.Delta)}");
-							if (currentContentBlockStart?.ToolUse is not null)
+							if (delta.Delta.ToolUse is not null && currentContentBlockStart?.ToolUse is not null)
 							{
 								fullResponse.Append(delta.Delta.ToolUse.Input);
 							}
-							else
+							else if (delta.Delta.Text is not null)
 							{
 								var text = delta.Delta.Text;
 								if (fullResponse.Length == 0) text = text.TrimStart();
@@ -131,15 +146,28 @@ namespace AgentDo.Bedrock
 								var eventTask = events?.OnMessageDelta?.Invoke(responseMessage.Role, text);
 								if (eventTask != null) await eventTask;
 							}
+							else if (delta.Delta.ReasoningContent is not null)
+							{
+								var reasoning = delta.Delta.ReasoningContent.Text;
+								if (reasoningResponse.Length == 0) reasoning = reasoning.TrimStart();
+								reasoningResponse.Append(reasoning);
+								var eventTask = events?.OnReasonDelta?.Invoke(responseMessage.Role, reasoning);
+								if (eventTask != null) await eventTask;
+							}
+							else
+							{
+								throw new ArgumentOutOfRangeException(nameof(delta), delta, "Unexpected type.");
+							}
 							break;
 						}
 					case ContentBlockStopEvent stop:
 						{
 							if (log) Console.WriteLine($"Content block {stop.ContentBlockIndex} stopped");
-							var text = fullResponse.ToString();
-							fullResponse.Clear();
+
 							if (currentContentBlockStart?.ToolUse is not null)
 							{
+								var text = fullResponse.ToString();
+								fullResponse.Clear();
 								responseMessage.Content.Add(new ContentBlock
 								{
 									ToolUse = new ToolUseBlock
@@ -150,12 +178,33 @@ namespace AgentDo.Bedrock
 									}
 								});
 							}
-							else
+							else if (fullResponse.Length > 0)
 							{
+								var text = fullResponse.ToString();
+								fullResponse.Clear();
 								responseMessage.Content.Add(new ContentBlock
 								{
 									Text = text,
 								});
+							}
+							else if (reasoningResponse.Length > 0)
+							{
+								var text = reasoningResponse.ToString();
+								reasoningResponse.Clear();
+								responseMessage.Content.Add(new ContentBlock
+								{
+									ReasoningContent = new ReasoningContentBlock
+									{
+										ReasoningText = new ReasoningTextBlock
+										{
+											Text = text,
+										},
+									}
+								});
+							}
+							else
+							{
+								throw new ArgumentOutOfRangeException(nameof(stop), stop, "Unexpected type.");
 							}
 							currentContentBlockStart = null;
 							break;

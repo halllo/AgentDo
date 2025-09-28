@@ -94,7 +94,7 @@ namespace AgentDo.OpenAI
 							{
 								var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
 								messages.Add(toolResultMessage);
-								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
+								resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, toolResults: [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
 							}
 
 							if (context.Cancelled)
@@ -181,7 +181,7 @@ namespace AgentDo.OpenAI
 										{
 											var toolResultMessage = GetAsToolResultMessage(toolUse.ToolUseId, toolResult.Result);
 											messages.Add(toolResultMessage);
-											resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, null, [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
+											resultMessages.Add(new(ChatMessageRole.Tool.ToString(), string.Empty, toolResults: [new Message.ToolResult { Id = toolUse.ToolUseId, Output = toolResultMessage.Content[0].Text }]));
 										}
 
 										if (context.Cancelled)
@@ -196,7 +196,7 @@ namespace AgentDo.OpenAI
 							}
 						default:
 							{
-								resultMessages.Add(new(completion.Role.ToString(), text, null, null, generationData));
+								resultMessages.Add(new(completion.Role.ToString(), text, generationData: generationData));
 								keepConversing = false;
 								break;
 							}

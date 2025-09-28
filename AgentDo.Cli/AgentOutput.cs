@@ -11,6 +11,7 @@ namespace AgentDo.Cli
 			{
 				BeforeMessage = (role, message) => { AnsiConsole.Markup($"[gray]{role}:[/] "); return Task.CompletedTask; },
 				OnMessageDelta = (role, message) => { AnsiConsole.Markup(message); return Task.CompletedTask; },
+				OnReasonDelta = (role, message) => { AnsiConsole.Markup($"[grey30]{message}[/]"); return Task.CompletedTask; },
 				AfterMessage = (role, message) => { AnsiConsole.MarkupLine(streaming ? string.Empty : $"[gray]{role}:[/] {message}"); return Task.CompletedTask; },
 				BeforeToolCall = (role, tool, toolUse, context, parameters) =>
 				{

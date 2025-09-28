@@ -16,9 +16,13 @@ namespace AgentDo.Cli.Verbs
 		[Value(0, MetaName = "Prompt", Required = true)]
 		public string Task { get; set; } = null!;
 
+		[Option('r', longName: "reasoning", HelpText = "reasoning budget tokens (default 0 = reasing disabled)")]
+		public int ReasoningBudget { get; set; } = 0;
+
 		public async Task Do(ILogger<Chat> logger, [FromKeyedServices("bedrock")] IAgent agent, IOptions<BedrockAgentOptions> options, IConfiguration config)
 		{
 			options.Value.Streaming = true;
+			options.Value.ReasoningBudget = ReasoningBudget;
 			var userMessage = Task;
 			var serializedHistory = default(string?);
 

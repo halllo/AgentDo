@@ -21,6 +21,7 @@ namespace AgentDo
 		{
 			public string Role { get; set; } = null!;
 			public string Text { get; set; } = null!;
+			public Message.Reasoning? Reason { get; set; }
 			public List<ToolUsing.ToolUse> Uses { get; set; } = null!;
 			public Message.GenerationData GenerationData { get; set; } = null!;
 		}
@@ -58,9 +59,9 @@ namespace AgentDo
 				Tools = Tools,
 				PendingToolUses = PendingToolUses,
 				Messages = Messages
-					.Where((m, index) => 
+					.Where((m, index) =>
 						index >= skip //skip the first messages (false)...
-						|| 
+						||
 						(string.Equals(m.Role, "system", StringComparison.InvariantCultureIgnoreCase) //...unless its a system message...
 							? (skip == skip++) //...then take it (evaluates to true) and at the same time prepare to skip one more non-system message.
 							: false)

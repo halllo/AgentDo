@@ -72,7 +72,7 @@ namespace AgentDo.Bedrock
 				if (options.Value.LogTask)
 				{
 					logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
-					var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text());
+					var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text() ?? string.Empty);
 					if (eventTask != null) await eventTask;
 				}
 			}
@@ -241,7 +241,7 @@ namespace AgentDo.Bedrock
 					if (!string.IsNullOrWhiteSpace(text))
 					{
 						logger.LogDebug("{Role}: {Text}", responseMessage.Role, text);
-						var eventTask = events?.AfterMessage?.Invoke(responseMessage.Role, text);
+						var eventTask = events?.AfterMessage?.Invoke(responseMessage.Role, text ?? string.Empty);
 						if (eventTask != null) await eventTask;
 						context.Text = text;
 					}

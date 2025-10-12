@@ -5,12 +5,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace AgentDo.Tests
 {
 	[TestClass]
 	public class TestMethodWithDI : TestMethodAttribute
 	{
+		public TestMethodWithDI([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = -1) : base(callerFilePath, callerLineNumber)
+		{
+		}
+
 		private static ServiceProvider? serviceProvider;
 
 		[AssemblyInitialize]
@@ -64,7 +69,7 @@ namespace AgentDo.Tests
 			serviceProvider?.Dispose();
 		}
 
-		public override TestResult[] Execute(ITestMethod testMethod)
+		public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
 		{
 			var nParameters = testMethod.ParameterTypes?.Length ?? 0;
 			if (nParameters != 0)
@@ -76,12 +81,12 @@ namespace AgentDo.Tests
 						.Select(p => scope.ServiceProvider.GetRequiredKeyedService(p.ParameterType, p.GetCustomAttribute<FromKeyedServicesAttribute>()?.Key))
 						.ToArray();
 
-					return [testMethod.Invoke(injectedArgs)];
+					return [await testMethod.InvokeAsync(injectedArgs)];
 				}
 			}
 			else
 			{
-				return base.Execute(testMethod);
+				return await base.ExecuteAsync(testMethod);
 			}
 		}
 	}

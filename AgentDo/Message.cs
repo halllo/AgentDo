@@ -5,7 +5,7 @@ namespace AgentDo
 	public class Message
 	{
 		public string Role { get; set; } = null!;
-		public string Text { get; set; } = null!;
+		public string? Text { get; set; }
 		public Reasoning? Reason { get; set; }
 		public ToolCall[]? ToolCalls { get; set; }
 		public ToolResult[]? ToolResults { get; set; }
@@ -22,7 +22,7 @@ namespace AgentDo
 		{
 		}
 
-		internal Message(string role, string text, Reasoning? reason = null, ToolCall[]? toolCalls = null, ToolResult[]? toolResults = null, GenerationData? generationData = null)
+		internal Message(string role, string? text, Reasoning? reason = null, ToolCall[]? toolCalls = null, ToolResult[]? toolResults = null, GenerationData? generationData = null)
 		{
 			Role = role;
 			Text = text;

@@ -12,14 +12,16 @@ namespace AgentDo.Bedrock
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, ToolResultBlock toolResult) => new() { Role = role, Content = [new ContentBlock { ToolResult = toolResult }] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [.. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<ToolUseBlock> toolUses) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. toolUses.Select(tu => new ContentBlock { ToolUse = tu })] };
-		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, ReasoningContentBlock? reason, params IEnumerable<ToolUseBlock> toolUses) => new()
+		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string? text, ReasoningContentBlock? reason, params IEnumerable<ToolUseBlock> toolUses) => new()
 		{
 			Role = role,
 			Content = [
 				.. reason == null
 					? Array.Empty<ContentBlock>()
 					: [new ContentBlock { ReasoningContent = reason }],
-				new ContentBlock { Text = text },
+				.. text == null
+					? Array.Empty<ContentBlock>()
+					: [new ContentBlock { Text = text }],
 				.. toolUses.Select(tu => new ContentBlock { ToolUse = tu })
 			]
 		};
@@ -30,7 +32,12 @@ namespace AgentDo.Bedrock
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, params IEnumerable<DocumentBlock> documents) => Says(role, text, [], documents);
 		public static Amazon.BedrockRuntime.Model.Message Says(this ConversationRole role, string text, IEnumerable<ImageBlock> images, IEnumerable<DocumentBlock> documents) => new() { Role = role, Content = [new ContentBlock { Text = text }, .. images.Select(i => new ContentBlock { Image = i }), .. documents.Select(d => new ContentBlock { Document = d })] };
 
-		public static string Text(this Amazon.BedrockRuntime.Model.Message message) => string.Concat(message.Content.Select(c => c.Text));
+		public static string? Text(this Amazon.BedrockRuntime.Model.Message message)
+		{
+			var texts = message.Content.Select(c => c.Text);
+			if (texts.All(t => t == null)) return null;
+			else return string.Concat(texts);
+		}
 		public static ReasoningTextBlock? Reason(this Amazon.BedrockRuntime.Model.Message message) => message.Content.Select(c => c.ReasoningContent?.ReasoningText).FirstOrDefault(r => r != null);
 		public static Message.Reasoning? Serialize(this ReasoningTextBlock? reasoning) => reasoning == null ? null : new Message.Reasoning { Text = reasoning.Text, Signature = reasoning.Signature };
 
@@ -98,6 +105,7 @@ namespace AgentDo.Bedrock
 		{
 			var fullResponse = new StringBuilder();
 			var reasoningResponse = new StringBuilder();
+			var reasoningSignature = default(string?);
 			var currentContentBlockStart = default(ContentBlockStart?);
 			var responseMessage = new Amazon.BedrockRuntime.Model.Message
 			{
@@ -148,11 +156,18 @@ namespace AgentDo.Bedrock
 							}
 							else if (delta.Delta.ReasoningContent is not null)
 							{
-								var reasoning = delta.Delta.ReasoningContent.Text;
-								if (reasoningResponse.Length == 0) reasoning = reasoning.TrimStart();
-								reasoningResponse.Append(reasoning);
-								var eventTask = events?.OnReasonDelta?.Invoke(responseMessage.Role, reasoning);
-								if (eventTask != null) await eventTask;
+								if (delta.Delta.ReasoningContent.Text is not null)
+								{
+									var reasoning = delta.Delta.ReasoningContent.Text;
+									if (reasoningResponse.Length == 0) reasoning = reasoning.TrimStart();
+									reasoningResponse.Append(reasoning);
+									var eventTask = events?.OnReasonDelta?.Invoke(responseMessage.Role, reasoning);
+									if (eventTask != null) await eventTask;
+								}
+								else if (delta.Delta.ReasoningContent.Signature is not null)
+								{
+									reasoningSignature = delta.Delta.ReasoningContent.Signature;
+								}
 							}
 							else
 							{
@@ -198,6 +213,7 @@ namespace AgentDo.Bedrock
 										ReasoningText = new ReasoningTextBlock
 										{
 											Text = text,
+											Signature = reasoningSignature,
 										},
 									}
 								});

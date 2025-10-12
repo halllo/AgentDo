@@ -1,6 +1,7 @@
 ﻿using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
@@ -82,6 +83,45 @@ namespace AgentDo.Tests.Bedrock
 
 			var input = responseMessage.Content[1].ToolUse.Input.FromAmazonJson();
 			Assert.AreEqual("{}", input);
+		}
+
+		[TestMethodWithDI]
+		public async Task TextToolTextStreaming(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			{
+				o.ReasoningBudget = null;
+				o.Streaming = true;
+			});
+
+			var result = await agent.Do(
+				task: "You are a friendly agent that uses as many emojis as possible.",
+				tools:
+				[
+					Tool.From([Description("Get today.")]() => "01 March 2025"),
+				]);
+
+			var serialized = JsonSerializer.Serialize(result);
+			Console.WriteLine("First Run\n" + JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
+			var deserialized = JsonSerializer.Deserialize<AgentResult>(serialized);
+
+			result = await agent.Do(
+				task: new Content.Prompt("What day is it?", deserialized),
+				tools: [
+					Tool.From([Description("Get today.")]() => "01 March 2025"),
+				]);
+
+			serialized = JsonSerializer.Serialize(result);
+			Console.WriteLine("Second Run\n" + JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
+			deserialized = JsonSerializer.Deserialize<AgentResult>(serialized);
+
+			result = await agent.Do(
+				task: new Content.Prompt("And tomorrow?", deserialized),
+				tools: [
+					Tool.From([Description("Get today.")]() => "01 March 2025"),
+				]);
+
+			Console.WriteLine("Third Run\n" + JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
 		}
 	}
 }

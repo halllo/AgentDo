@@ -53,7 +53,8 @@ namespace AgentDo.Tests.Bedrock
 
 			var reasoning = responseMessage.Content[0].ReasoningContent;
 			Console.WriteLine(reasoning.ReasoningText.Text);
-
+			Assert.IsFalse(string.IsNullOrWhiteSpace(reasoning.ReasoningText.Signature));
+			
 			var text = responseMessage.Content[1].Text;
 			Console.WriteLine(text);
 

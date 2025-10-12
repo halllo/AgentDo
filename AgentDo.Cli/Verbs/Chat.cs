@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.Client;
 using Spectre.Console;
 using System.Text.Json;
 
@@ -26,6 +27,29 @@ namespace AgentDo.Cli.Verbs
 			var userMessage = Task;
 			var serializedHistory = default(string?);
 
+			var mcpServerConfigs = config.GetSection("McpServers").Get<McpServer[]>()?.ToList() ?? [];
+			var mcpClients = await mcpServerConfigs
+				.ToAsyncEnumerable()
+				.SelectAwait(async c => await McpClient.CreateAsync(new StdioClientTransport(new()
+				{
+					Name = c.Name,
+					Command = c.Command,
+				})))
+				.ToListAsync();
+			var mcpClientTools = await mcpClients
+				.ToAsyncEnumerable()
+				.SelectManyAwait(async c => (await c.ListToolsAsync()).ToAsyncEnumerable())
+				.ToListAsync();
+
+			if (mcpClients.Any())
+			{
+				Console.WriteLine("Available MCP Client Tools:");
+				foreach (var tool in mcpClientTools)
+				{
+					Console.WriteLine($"- {tool.Name}");
+				}
+			}
+
 			while (!string.IsNullOrWhiteSpace(userMessage))
 			{
 				if (userMessage.Equals("/prompts", StringComparison.OrdinalIgnoreCase))
@@ -42,7 +66,9 @@ namespace AgentDo.Cli.Verbs
 				var history = serializedHistory == null ? null : JsonSerializer.Deserialize<AgentResult>(serializedHistory);
 				var result = await agent.Do(
 					task: new Prompt(userMessage, history),
-					tools: [],
+					tools: [
+						.. mcpClientTools.Select(tool => Tool.From(tool))
+					],
 					events: AgentOutput.Events(streaming: true));
 
 				serializedHistory = JsonSerializer.Serialize(result);
@@ -50,6 +76,20 @@ namespace AgentDo.Cli.Verbs
 				AnsiConsole.Markup("[gray]user:[/] ");
 				userMessage = Console.ReadLine() ?? "";
 			}
+
+			foreach (var mcpClient in mcpClients)
+			{
+				try
+				{
+					await mcpClient.DisposeAsync();
+				}
+				catch (Exception ex)
+				{
+					logger.LogWarning(ex, "Failed to dispose MCP client {Name}", mcpClient.ServerInfo.Name);
+				}
+			}
 		}
+
+		record McpServer(string Name, string Command);
 	}
 }

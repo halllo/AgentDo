@@ -24,7 +24,6 @@ namespace AgentDo.OpenAI
 		public async Task<AgentResult> Do(Prompt task, List<Tool> tools, Events? events = null, CancellationToken cancellationToken = default)
 		{
 			if (task.Images.Any()) throw new NotSupportedException("Images are not supported yet.");
-			if (task.Documents.Any()) throw new NotSupportedException("Documents are not supported yet.");
 
 			var pendingToolUses = task.AgentContext?.PendingToolUses;
 			var promptPreviousMessages = task.AgentContext?.Messages ?? [];
@@ -41,7 +40,10 @@ namespace AgentDo.OpenAI
 			var resultMessages = promptPreviousMessages.ToList();
 
 			var taskMessage = pendingToolUses == null
-				? new UserChatMessage(task.Text)
+				? new UserChatMessage([
+					ChatMessageContentPart.CreateTextPart(task.Text),
+					.. task.Documents.Select(d => d.ForOpenAI())
+				])
 				: null;
 
 			if (taskMessage != null)

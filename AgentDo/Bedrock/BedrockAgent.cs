@@ -182,6 +182,7 @@ namespace AgentDo.Bedrock
 				else
 				{
 					var converseDurationStopwatch = Stopwatch.StartNew();
+					var systemPrompt = options.Value.SystemPrompt == null ? default(List<SystemContentBlock>?) : [new SystemContentBlock { Text = options.Value.SystemPrompt }];
 					var reasoningConfig = options.Value.ReasoningBudget > 0 ? Amazon.Runtime.Documents.Document.FromObject(new
 					{
 						thinking = new Dictionary<string, object>
@@ -199,6 +200,7 @@ namespace AgentDo.Bedrock
 						var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 						{
 							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+							System = systemPrompt,
 							AdditionalModelRequestFields = reasoningConfig,
 							Messages = messages,
 							ToolConfig = toolConfig,
@@ -212,6 +214,7 @@ namespace AgentDo.Bedrock
 						var response = await bedrock.ConverseAsync(new ConverseRequest
 						{
 							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
+							System = systemPrompt,
 							Messages = messages,
 							AdditionalModelRequestFields = reasoningConfig,
 							ToolConfig = toolConfig,

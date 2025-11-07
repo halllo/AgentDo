@@ -161,5 +161,41 @@ namespace AgentDo.Tests.Bedrock
 			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
 			Assert.IsNull(registeredPerson.Address!.Street);
 		}
+
+		[TestMethodWithDI]
+		public async Task MultipleToolsCallsInSameRun(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
+		{
+			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o => o.ReasoningBudget = 2000);
+
+			Person? registeredPerson = default;
+			var result = await agent.Do(
+				task: "I would like to register Max Musterman from Karlsruhe. If you lack information, see if you can get it by using the available tools.",
+				tools:
+				[
+					Tool.From([Description("Register person.")] (Person person) =>
+					{
+						registeredPerson = person;
+						return "registered";
+					}),
+
+					Tool.From([Description("Get birthday.")](string person, Tool.Context ctx) =>
+					{
+						return "01 March 2000";
+					}),
+
+					Tool.From([Description("Calculate age.")](string birthday, Tool.Context ctx) =>
+					{
+						return 25;
+					}),
+				]);
+
+			Console.WriteLine(JsonSerializer.Serialize(result.Messages, new JsonSerializerOptions { WriteIndented = true }));
+			Assert.IsNotNull(registeredPerson);
+			Assert.AreEqual("Max Musterman", registeredPerson.Name);
+			Assert.AreEqual(25, registeredPerson.Age);
+			Assert.IsNotNull(registeredPerson.Address);
+			Assert.AreEqual("Karlsruhe", registeredPerson.Address!.City);
+			Assert.IsNull(registeredPerson.Address!.Street);
+		}
 	}
 }

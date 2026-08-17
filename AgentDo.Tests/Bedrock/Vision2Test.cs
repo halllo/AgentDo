@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using AgentDo.Content;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
@@ -14,11 +14,13 @@ namespace AgentDo.Tests.Bedrock
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, RequiresAsset(TestAssets.CreditCardStatementPng)]
+		[TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockAgentWithImageAndToolInvocation(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			using var image = Image.From(TestAssets.File(TestAssets.CreditCardStatementPng));
 			CreditCardStatement? creditCardStatement = default;
 			var messages = await agent.Do(
 				task: new Prompt("Here is my credit card statement.", image),

@@ -21,12 +21,9 @@ namespace AgentDo.Tests
 		[AssemblyInitialize]
 		public static void AssemblyInitialize(TestContext _)
 		{
-			var builder = new ConfigurationBuilder();
-			builder.SetBasePath(Directory.GetCurrentDirectory());
-			builder.AddJsonFile("./appsettings.json");
-			builder.AddJsonFile("./appsettings.local.json", optional: true);
-			builder.AddEnvironmentVariables();
-			var config = builder.Build();
+			// The same configuration the [Requires*] conditions evaluate, so a test can never be
+			// scheduled to run against settings its condition did not see.
+			var config = TestEnvironment.Configuration;
 
 			var services = new ServiceCollection();
 			services.AddLogging();
@@ -45,16 +42,13 @@ namespace AgentDo.Tests
 			//Local
 			services.AddHttpClient("local", c =>
 			{
-				c.BaseAddress = new Uri("http://localhost:1234/");
+				c.BaseAddress = TestEnvironment.LocalLlmBaseAddress;
 				c.Timeout = TimeSpan.FromMinutes(5);
 			}).AddAsKeyed();
 			services.Configure<OpenAILikeClient.Options>("local", o =>
 			{
 				o.ParallelToolCalls = false;
-				//o.Model = "hermes-3-llama-3.2-3b";
-				//o.Model = "hermes-2-pro-mistral-7b";
-				//o.Model = "llama-3.3-70b-instruct";
-				o.Model = "gemma-3-27b-it";
+				o.Model = TestEnvironment.LocalLlmModel;
 			});
 			services.AddKeyedTransient("local", (sp, key) => new OpenAILikeClient(
 				http: sp.GetRequiredKeyedService<HttpClient>(key),

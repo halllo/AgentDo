@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -10,9 +10,10 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class ContinueTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ContinueChat(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 
 			var registeredName = default(string?);
 			var registerResult = await agent.Do(
@@ -46,9 +47,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SuspendAndResumeOneTool(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 
 			var suspended = await agent.Do(
 				task: "Whats the weather?",
@@ -78,9 +80,10 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SuspendAndResumeTwoTools(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 
 			Person? registeredPerson = default;
 			var suspended = await agent.Do(
@@ -99,6 +102,8 @@ namespace AgentDo.Tests.Bedrock
 					}),
 				]);
 
+			Console.WriteLine("Suspended messages:\n" + JsonSerializer.Serialize(suspended.Messages, new JsonSerializerOptions { WriteIndented = true }));
+
 			var resumed = await agent.Do(
 				task: new Content.Prompt(string.Empty, suspended),
 				tools:
@@ -109,7 +114,7 @@ namespace AgentDo.Tests.Bedrock
 						return "registered";
 					}),
 
-					Tool.From([Description("Get today.")]() => 
+					Tool.From([Description("Get today.")]() =>
 					{
 						return "01 March 2025";
 					}),

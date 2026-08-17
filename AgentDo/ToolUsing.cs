@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
@@ -50,7 +50,7 @@ namespace AgentDo
 			};
 			return schema;
 
-			///copilot generated, not sure if it's 100% correct
+			//copilot generated, not sure if it's 100% correct
 			static bool IsNullable(ParameterInfo parameter)
 			{
 				if (parameter.ParameterType.IsValueType)
@@ -83,6 +83,9 @@ namespace AgentDo
 			var parameters = method.GetParameters()
 				.Select(p =>
 					p.ParameterType == typeof(Tool.Context) ? context :
+					// Without this a tool declaring a CancellationToken silently gets default,
+					// so a long-running tool could never be cancelled by its caller.
+					p.ParameterType == typeof(CancellationToken) ? cancellationToken :
 					p.ParameterType == typeof(JsonObject) ? inputs :
 					p.ParameterType == typeof(JsonDocument) ? JsonDocument.Parse(inputs.ToJsonString(JsonSchemaExtensions.OutputOptions)) :
 					inputs.TryGetPropertyValue(p.Name, out var value) ? value.As(p.ParameterType, autoDiscoverConverters) : default
@@ -90,13 +93,13 @@ namespace AgentDo
 				.ToArray();
 
 			var invokeTask = beforeInvoke?.Invoke(parameters);
-			if (invokeTask != null) await invokeTask;
+			if (invokeTask != null) await invokeTask.ConfigureAwait(false);
 
 			var returnValue = tool.DynamicInvoke(parameters);
 			object? result;
 			if (returnValue is Task task)
 			{
-				await task;
+				await task.ConfigureAwait(false);
 				var taskResult = task.GetType().GetProperty("Result").GetValue(task);
 				result = taskResult == null || taskResult.GetType().Name == "VoidTaskResult" ? null : taskResult;
 			}
@@ -127,7 +130,7 @@ namespace AgentDo
 			}
 			else
 			{
-				return await Use(toolToUse, toolUse, role, context, events, logger, ignoreInvalidSchema: ignoreInvalidSchema, cancellationToken: cancellationToken);
+				return await Use(toolToUse, toolUse, role, context, events, logger, ignoreInvalidSchema: ignoreInvalidSchema, cancellationToken: cancellationToken).ConfigureAwait(false);
 			}
 		}
 
@@ -157,8 +160,8 @@ namespace AgentDo
 						logger?.LogDebug("{Role}: Invoking {ToolUse}()...", role, name);
 					}
 					var eventTask = events?.BeforeToolCall?.Invoke(role, tool, toolUse, context, parameters);
-					if (eventTask != null) await eventTask;
-				}, cancellationToken);
+					if (eventTask != null) await eventTask.ConfigureAwait(false);
+				}, cancellationToken).ConfigureAwait(false);
 
 				if (logInputsAndOutputs)
 				{
@@ -169,12 +172,12 @@ namespace AgentDo
 					logger?.LogDebug("{Tool}:" + (context?.Cancelled ?? false ? " Cancelled!" : string.Empty), id);
 				}
 				var eventTask = events?.AfterToolCall?.Invoke(id, tool, toolUse, context, result);
-				if (eventTask != null) await eventTask;
+				if (eventTask != null) await eventTask.ConfigureAwait(false);
 				return (new ToolResult(result), null);
 			}
 			catch (JsonException invalidSchema) when (ignoreInvalidSchema)
 			{
-				logger?.LogError(invalidSchema, "{Role}: Invoking {ToolUse}(@Input) failed because invalid schema.", role, name, inputs);
+				logger?.LogError(invalidSchema, "{Role}: Invoking {ToolUse}({Input}) failed because invalid schema.", role, name, inputs);
 				return (new ToolResult("failed"), null);
 			}
 		}

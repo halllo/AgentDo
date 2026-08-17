@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace AgentDo.Tests.Local
 {
@@ -8,6 +8,7 @@ namespace AgentDo.Tests.Local
 		record Person(string Name, int Age);
 
 		[TestMethodWithDI]
+		[TestCategory(TestCategories.Offline)]
 		public void NestedFunctionCall()
 		{
 			// llama-3.3-70b-instruct produces a function call expression like this:

@@ -28,18 +28,21 @@ namespace AgentDo.Cli.Verbs
 			var serializedHistory = default(string?);
 
 			var mcpServerConfigs = config.GetSection("McpServers").Get<McpServer[]>()?.ToList() ?? [];
-			var mcpClients = await mcpServerConfigs
-				.ToAsyncEnumerable()
-				.SelectAwait(async c => await McpClient.CreateAsync(new StdioClientTransport(new()
+			var mcpClients = new List<McpClient>();
+			foreach (var mcpServerConfig in mcpServerConfigs)
+			{
+				mcpClients.Add(await McpClient.CreateAsync(new StdioClientTransport(new()
 				{
-					Name = c.Name,
-					Command = c.Command,
-				})))
-				.ToListAsync();
-			var mcpClientTools = await mcpClients
-				.ToAsyncEnumerable()
-				.SelectManyAwait(async c => (await c.ListToolsAsync()).ToAsyncEnumerable())
-				.ToListAsync();
+					Name = mcpServerConfig.Name,
+					Command = mcpServerConfig.Command,
+				})));
+			}
+
+			var mcpClientTools = new List<McpClientTool>();
+			foreach (var mcpClient in mcpClients)
+			{
+				mcpClientTools.AddRange(await mcpClient.ListToolsAsync());
+			}
 
 			if (mcpClients.Any())
 			{

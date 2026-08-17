@@ -1,14 +1,15 @@
-﻿using PDFtoImage;
+using PDFtoImage;
 
 namespace AgentDo.Tests
 {
 	[TestClass]
 	public sealed class PdfToImageTest
 	{
-		[TestMethod, Ignore]
+		[TestMethod, RequiresAsset(TestAssets.CreditCardStatementPdf)]
+		[TestCategory(TestCategories.Offline)]
 		public void PdfToPngs()
 		{
-			var pdf = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
+			var pdf = TestAssets.File(TestAssets.CreditCardStatementPdf);
 			using var pdfStream = pdf.OpenRead();
 			var pageCount = Conversion.GetPageCount(pdfStream, leaveOpen: true);
 			for (int page = 0; page < pageCount; page++)

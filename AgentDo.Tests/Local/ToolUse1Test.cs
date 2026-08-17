@@ -1,16 +1,17 @@
-﻿using AgentDo.OpenAI.Like;
+using AgentDo.OpenAI.Like;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 
 namespace AgentDo.Tests.Local
 {
-	[TestClass]
+	[TestClass, RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 	public sealed class ToolUse1Test
 	{
 		record Person(string Name, int Age, Address? Address = null);
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 		public async Task LocalCompletionWithReflectedToolAndReflectedResponse([FromKeyedServices("local")] OpenAILikeClient client)
 		{
 			OpenAILikeClient.Message[] messages =

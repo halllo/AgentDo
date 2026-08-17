@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.ComponentModel.DataAnnotations;
@@ -102,6 +102,7 @@ namespace AgentDo.Tests.Bedrock
 		record Artist(string Name, string Pseudonym = "abc");
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task NestedObjects(IAmazonBedrockRuntime bedrock)
 		{
 			var expectedTool = new Amazon.BedrockRuntime.Model.Tool
@@ -127,8 +128,10 @@ namespace AgentDo.Tests.Bedrock
 			AssertEqual(expectedTool, bedrockTool);
 
 			//Actually processing it as json
-			var response = await bedrock.ConverseWithTool("I would like to rate the sone All Too Well by Taylor Swift with 1.", bedrockTool);
-			var toolUse = response.Output.Message.Content[1].ToolUse;
+			// The prompt has to carry every required property of the schema (including the song
+			// length), otherwise the model asks for the missing one instead of calling the tool.
+			var response = await bedrock.ConverseWithTool("I would like to rate the song All Too Well by Taylor Swift, which is 10.13 minutes long, with 1.", bedrockTool);
+			var toolUse = response.Output.Message.Content.First(c => c.ToolUse != null).ToolUse;
 			var songRating = toolUse.Input.FromAmazonJson<RateSongToolWithNestedObjects>()!;
 			Assert.AreEqual("Taylor Swift", songRating.Song.Artist.Name);
 			Assert.AreEqual("abc", songRating.Song.Artist.Pseudonym);
@@ -156,6 +159,7 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task PrimitivesAndNestedObjectWithNullableProperty(IAmazonBedrockRuntime bedrock)
 		{
 			RecognizedAlbum? toolCall = null;
@@ -167,8 +171,10 @@ namespace AgentDo.Tests.Bedrock
 			var bedrockTool = usableTool.ForBedrock();
 
 			//Actually processing it as json
-			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift. It was already bought three times.", bedrockTool);
-			var toolUse = response.Output.Message.Content[1].ToolUse;
+			// Price, clerk and stock are required by the schema, so the prompt has to state them.
+			// The custom alias stays unmentioned on purpose - it is optional and asserted to be null.
+			var response = await bedrock.ConverseWithTool("Here is the Album RED from Taylor Swift. It costs 19.99, the clerk is Bob and it is in stock. It was already bought three times.", bedrockTool);
+			var toolUse = response.Output.Message.Content.First(c => c.ToolUse != null).ToolUse;
 			var recognized = toolUse.Input.FromAmazonJson<RecognizedAlbum>()!;
 			Console.WriteLine(JsonSerializer.Serialize(recognized));
 			Assert.AreEqual("Taylor Swift", recognized.Album.Artist.Name);

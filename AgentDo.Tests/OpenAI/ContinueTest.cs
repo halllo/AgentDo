@@ -1,4 +1,4 @@
-﻿using AgentDo.OpenAI;
+using AgentDo.OpenAI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
@@ -11,6 +11,7 @@ namespace AgentDo.Tests.OpenAI
 	public sealed class ContinueTest
 	{
 		[TestMethodWithDI]
+		[RequiresOpenAI, TestCategory(TestCategories.OpenAI)]
 		public async Task ChatSuspendResumeChat(ChatClient client, ILoggerFactory loggerFactory)
 		{
 			var agent = new OpenAIAgent(

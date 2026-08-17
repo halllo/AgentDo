@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.AI;
+using Microsoft.Extensions.AI;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -56,12 +56,53 @@ namespace AgentDo
 				tool: async (JsonObject i) =>
 				{
 					var arguments = i.Deserialize<Dictionary<string, object?>>();
-					var result = await aiFunction.InvokeAsync(new AIFunctionArguments(arguments));
-					return result;
+					var result = await aiFunction.InvokeAsync(new AIFunctionArguments(arguments)).ConfigureAwait(false);
+					return UnwrapContent(result);
 				},
 				logInputsAndOutputs: logInputsAndOutputs,
 				requireApproval: requireApproval,
 				schema: JsonDocument.Parse(aiFunction.JsonSchema.ToString()));
+		}
+
+		/// <summary>
+		/// MCP tools - and anything else built on Microsoft.Extensions.AI content - hand back
+		/// <see cref="AIContent"/> objects rather than plain values. Serializing one of those
+		/// reflectively shows the model "$type", "Annotations" and "AdditionalProperties" noise,
+		/// with the actual payload double-encoded as an escaped string. Unwrap it to what the tool
+		/// really returned. Plain values already arrive as JsonElement and are passed through.
+		/// </summary>
+		private static object? UnwrapContent(object? result)
+		{
+			switch (result)
+			{
+				case TextContent text:
+					return AsJsonIfPossible(text.Text);
+
+				case IEnumerable<AIContent> contents:
+					var texts = contents.OfType<TextContent>().Select(c => c.Text).ToList();
+					// Nothing textual in there (images, audio); leave it for the caller to handle.
+					if (texts.Count == 0) return result;
+					return texts.Count == 1 ? AsJsonIfPossible(texts[0]) : string.Join("\n", texts);
+
+				default:
+					return result;
+			}
+		}
+
+		/// <summary>
+		/// MCP tools conventionally return their payload as a JSON string. Handing the model a
+		/// parsed object beats handing it the same thing escaped inside a string.
+		/// </summary>
+		private static object AsJsonIfPossible(string text)
+		{
+			try
+			{
+				return JsonDocument.Parse(text).RootElement.Clone();
+			}
+			catch (JsonException)
+			{
+				return text;
+			}
 		}
 
 		private static string GetToolName(Delegate tool, string toolName)

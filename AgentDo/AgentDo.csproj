@@ -15,6 +15,21 @@
 		<RepositoryUrl>https://github.com/halllo/AgentDo</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+		<!-- Consumers get IntelliSense, and a debugger can step into the package. -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+		<!-- The .NET analyzers are off by default for a netstandard2.0 TFM, which hid a real
+		     logging bug. The library is at zero warnings, so keep it that way. -->
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisMode>Recommended</AnalysisMode>
+
+		<!-- Undocumented public members are a separate cleanup; do not fail the build on them. -->
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -23,14 +38,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.14.5" />
-		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.2" />
-		<PackageReference Include="Microsoft.Extensions.AI" Version="10.2.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.2" />
-		<PackageReference Include="OpenAI" Version="2.8.0" />
+		<PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.101.1" />
+		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.11" />
+		<PackageReference Include="Microsoft.Extensions.AI" Version="10.9.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
+		<PackageReference Include="OpenAI" Version="2.13.0" />
 		<PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-		<PackageReference Include="System.Text.Json" Version="10.0.2" />
+		<PackageReference Include="System.Text.Json" Version="10.0.11" />
 	</ItemGroup>
 
 </Project>

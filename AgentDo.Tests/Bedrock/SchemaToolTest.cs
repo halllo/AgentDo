@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -9,11 +9,12 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class SchemaToolTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ToolFromJsonSchema(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var registrations = new List<JsonDocument>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			var messages = await agent.Do(
 				task: "Its March 2025. I would like to register Manuel Naujoks (born in September 1986) from Karlsruhe.",
 				tools:

@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.Globalization;
@@ -18,9 +18,11 @@ namespace AgentDo.Tests.Bedrock
 		record Amount(decimal Value);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, RequiresAsset(TestAssets.CreditCardStatementPng)]
+		[TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithImageAndSchemaAndSeparateDeserialized(IAmazonBedrockRuntime bedrock)
 		{
-			var png = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png");
+			var png = TestAssets.File(TestAssets.CreditCardStatementPng);
 			using var pngStream = new MemoryStream(File.ReadAllBytes(png.FullName));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
@@ -63,7 +65,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var response = await bedrock.ConverseAsync(new ConverseRequest
 			{
-				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+				ModelId = TestModels.Sonnet,
 				Messages = messages,
 				ToolConfig = new ToolConfiguration { Tools = [tool] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }

@@ -1,4 +1,4 @@
-﻿using OpenAI.Chat;
+using OpenAI.Chat;
 using System.Text.Json;
 
 namespace AgentDo.Tests.OpenAI
@@ -7,6 +7,7 @@ namespace AgentDo.Tests.OpenAI
 	public sealed class ToolUse0Test
 	{
 		[TestMethodWithDI]
+		[RequiresOpenAI, TestCategory(TestCategories.OpenAI)]
 		public async Task OpenAICompletionWithManualJsonSchemaAndManualResponseParsing(ChatClient client)
 		{
 			List<ChatMessage> messages =

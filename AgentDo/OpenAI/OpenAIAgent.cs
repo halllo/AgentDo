@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
@@ -54,7 +54,7 @@ namespace AgentDo.OpenAI
 				{
 					logger.LogDebug("{Role}: {Text}", ChatMessageRole.User, taskMessage.Text());
 					var eventTask = events?.AfterMessage?.Invoke(ChatMessageRole.User.ToString(), taskMessage.Text());
-					if (eventTask != null) await eventTask;
+					if (eventTask != null) await eventTask.ConfigureAwait(false);
 				}
 			}
 
@@ -75,7 +75,7 @@ namespace AgentDo.OpenAI
 				{
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -113,7 +113,7 @@ namespace AgentDo.OpenAI
 				else
 				{
 					var chatDurationStopwatch = Stopwatch.StartNew();
-					ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken);
+					ChatCompletion completion = await client.CompleteChatAsync(messages, completionOptions, cancellationToken).ConfigureAwait(false);
 					chatDurationStopwatch.Stop();
 					messages.Add(new AssistantChatMessage(completion));
 
@@ -122,7 +122,7 @@ namespace AgentDo.OpenAI
 					{
 						logger.LogDebug("{Role}: {Text}", completion.Role, text);
 						var eventTask = events?.AfterMessage?.Invoke(completion.Role.ToString(), text);
-						if (eventTask != null) await eventTask;
+						if (eventTask != null) await eventTask.ConfigureAwait(false);
 						context.Text = text;
 					}
 
@@ -156,7 +156,7 @@ namespace AgentDo.OpenAI
 										toolResults: null,
 										generationData: generationData));
 
-									var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, completion.Role.ToString(), context, events, logger, cancellationToken: cancellationToken);
+									var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, completion.Role.ToString(), context, events, logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 
 									if (toolResult == null && requiresApproval != null)
 									{

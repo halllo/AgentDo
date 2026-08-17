@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
@@ -44,6 +44,9 @@ namespace AgentDo.Bedrock
 						: m.Role.Says(m.m.ToolResults.Select(r => GetAsToolResultMessage(r.Id, r.Output.ToAmazonJson()))),
 					_ => m.Role.Says(m.m.GetTextualRepresentation()),
 				})
+				// A stored message can rehydrate into nothing at all (no text, no tool calls,
+				// no tool results). Bedrock rejects contentless messages, so leave them out.
+				.Where(m => m.Content.Count > 0)
 				.ToList();
 
 			var images = task.Images.Select(i => i.ForBedrock()).ToList();
@@ -67,18 +70,33 @@ namespace AgentDo.Bedrock
 					documents: documents)
 				: null;
 
+			// Resuming passes an empty prompt, which leaves nothing to send.
+			if (taskMessage != null && taskMessage.Content.Count == 0) taskMessage = null;
+
 			if (taskMessage != null)
 			{
 				if (options.Value.LogTask)
 				{
 					logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.Text());
 					var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Text() ?? string.Empty);
-					if (eventTask != null) await eventTask;
+					if (eventTask != null) await eventTask.ConfigureAwait(false);
 				}
 			}
 
 			var messages = previousMessages.Concat(taskMessage != null ? [taskMessage] : []).ToList();
 			var resultMessages = promptPreviousMessages.Concat(taskMessage != null ? [new(taskMessage.Role, taskMessage.Text(), generationData: new Message.GenerationData { GeneratedAt = DateTimeOffset.UtcNow })] : []).ToList();
+
+			// Resuming passes an empty prompt, so there may be nothing at all to add: no prompt,
+			// no tool uses left to resume, nothing pending approval. If the conversation then ends
+			// with the assistant's own message, Bedrock rejects it ("the conversation must end with
+			// a user message") - the model has already had the last word. Hand back what we have
+			// rather than pay for a call that cannot succeed.
+			if (taskMessage == null && resumableToolUses.Count == 0 && pendingToolUses == null
+				&& messages.LastOrDefault()?.Role?.Value != ConversationRole.User.Value)
+			{
+				logger.LogDebug("Nothing to do: no prompt, no tool uses to resume and nothing pending.");
+				return new AgentResult { Agent = this, Task = task, Tools = tools, Messages = resultMessages };
+			}
 
 			var toolConfig = tools.Count == 0 ? null : new ToolConfiguration()
 			{
@@ -100,7 +118,7 @@ namespace AgentDo.Bedrock
 					var toolResults = new List<ToolResultBlock>();
 					foreach (var resumableToolUse in remainingResumableToolUses)
 					{
-						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, resumableToolUse, previousMessages.Last().Role, context, events, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, resumableToolUse, previousMessages.Last().Role, context, events, logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 						if (toolResult == null && requiresApproval != null)
 						{
 							return new AgentResult
@@ -128,11 +146,16 @@ namespace AgentDo.Bedrock
 						else throw new ArgumentException("No tool result and no approval requirement.");
 					}
 
-					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+					// No results means a contentless message, which Bedrock rejects.
+					if (toolResults.Count > 0 && (!context.Cancelled || context.RememberToolResultWhenCancelled))
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
 						resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
 					}
+
+					// Suspending above only broke out of the foreach. Without this the run falls
+					// through and converses with an unanswered tool use, which Bedrock rejects.
+					if (!keepConversing) break;
 				}
 				if (pendingToolUses != null)
 				{
@@ -143,7 +166,7 @@ namespace AgentDo.Bedrock
 
 					foreach (var toolUse in pendingToolUses.Uses.SkipWhile(t => t.ToolResult != null))
 					{
-						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken);
+						var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, pendingToolUses.Role, context, events, logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 
 						if (toolResult == null && requiresApproval != null)
 						{
@@ -172,7 +195,8 @@ namespace AgentDo.Bedrock
 						else throw new ArgumentException("No tool result and no approval requirement.");
 					}
 
-					if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+					// No results means a contentless message, which Bedrock rejects.
+					if (toolResults.Count > 0 && (!context.Cancelled || context.RememberToolResultWhenCancelled))
 					{
 						messages.Add(ConversationRole.User.Says(toolResults));
 						resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));
@@ -182,7 +206,9 @@ namespace AgentDo.Bedrock
 				else
 				{
 					var converseDurationStopwatch = Stopwatch.StartNew();
-					var systemPrompt = options.Value.SystemPrompt == null ? default(List<SystemContentBlock>?) : [new SystemContentBlock { Text = options.Value.SystemPrompt }];
+					// A blank system prompt is rejected by Bedrock just like a blank text block,
+					// and binding an empty config key yields "" rather than null.
+					var systemPrompt = string.IsNullOrWhiteSpace(options.Value.SystemPrompt) ? default(List<SystemContentBlock>?) : [new SystemContentBlock { Text = options.Value.SystemPrompt }];
 					var reasoningConfig = options.Value.ReasoningBudget > 0 ? Amazon.Runtime.Documents.Document.FromObject(new
 					{
 						thinking = new Dictionary<string, object>
@@ -197,7 +223,8 @@ namespace AgentDo.Bedrock
 					StopReason stopReason;
 					if (options.Value.Streaming)
 					{
-						var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
+						// Holds the live HTTP response, so it has to be disposed.
+						using var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 						{
 							ModelId = options.Value.ModelId ?? throw new ArgumentNullException(nameof(options.Value.ModelId), "No ModelId provided."),
 							System = systemPrompt,
@@ -205,9 +232,9 @@ namespace AgentDo.Bedrock
 							Messages = messages,
 							ToolConfig = toolConfig,
 							InferenceConfig = inferenceConfig,
-						}, cancellationToken);
+						}, cancellationToken).ConfigureAwait(false);
 
-						(responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage(events);
+						(responseMessage, tokenUsage, stopReason) = await streamResponse.ToMessage(events, cancellationToken: cancellationToken).ConfigureAwait(false);
 					}
 					else
 					{
@@ -219,7 +246,7 @@ namespace AgentDo.Bedrock
 							AdditionalModelRequestFields = reasoningConfig,
 							ToolConfig = toolConfig,
 							InferenceConfig = inferenceConfig,
-						}, cancellationToken);
+						}, cancellationToken).ConfigureAwait(false);
 
 						responseMessage = response.Output.Message;
 						tokenUsage = response.Usage;
@@ -236,7 +263,17 @@ namespace AgentDo.Bedrock
 
 					converseDurationStopwatch.Stop();
 
-					messages.Add(responseMessage);
+					// This message goes straight back out with the next request, and Bedrock rejects
+					// a ContentBlock whose text is blank - which models routinely emit next to tool
+					// use. Drop those blocks before they poison the rest of the conversation.
+					// (Content is null rather than empty when the service returns no blocks at all.)
+					responseMessage.Content = [.. (responseMessage.Content ?? [])
+						.Where(c => c.Text == null || !string.IsNullOrWhiteSpace(c.Text))];
+
+					if (responseMessage.Content.Count > 0)
+					{
+						messages.Add(responseMessage);
+					}
 
 					var text = responseMessage.Text();
 					var reason = responseMessage.Reason().Serialize();
@@ -245,7 +282,7 @@ namespace AgentDo.Bedrock
 					{
 						logger.LogDebug("{Role}: {Text}", responseMessage.Role, text);
 						var eventTask = events?.AfterMessage?.Invoke(responseMessage.Role, text ?? string.Empty);
-						if (eventTask != null) await eventTask;
+						if (eventTask != null) await eventTask.ConfigureAwait(false);
 						context.Text = text;
 					}
 
@@ -263,6 +300,14 @@ namespace AgentDo.Bedrock
 							})
 							.ToList();
 
+						if (toolUses.Count == 0)
+						{
+							// Stopping for tool use without a tool block (a truncated stream can do
+							// this) would otherwise re-send an identical request forever.
+							logger.LogWarning("Stopped for tool use but no tool call was returned.");
+							keepConversing = false;
+						}
+
 						resultMessages.Add(new Message(responseMessage.Role, text, reason,
 							toolCalls: [.. toolUses.Select(t => new Message.ToolCall { Name = t.ToolName, Id = t.ToolUseId, Input = t.ToolInput })],
 							toolResults: null,
@@ -272,7 +317,7 @@ namespace AgentDo.Bedrock
 						foreach (var toolUse in toolUses)
 						{
 							cancellationToken.ThrowIfCancellationRequested();
-							var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, responseMessage.Role, context, events, logger, cancellationToken: cancellationToken);
+							var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolUse, responseMessage.Role, context, events, logger, cancellationToken: cancellationToken).ConfigureAwait(false);
 
 							if (toolResult == null && requiresApproval != null)
 							{
@@ -308,7 +353,8 @@ namespace AgentDo.Bedrock
 							else throw new ArgumentException("No tool result and no approval requirement.");
 						}
 
-						if (!context.Cancelled || context.RememberToolResultWhenCancelled)
+						// No results means a contentless message, which Bedrock rejects.
+						if (toolResults.Count > 0 && (!context.Cancelled || context.RememberToolResultWhenCancelled))
 						{
 							messages.Add(ConversationRole.User.Says(toolResults));
 							resultMessages.Add(new Message(ConversationRole.User, "", toolResults: [.. toolResults.Select(t => new Message.ToolResult { Id = t.ToolUseId, Output = t.Content.FirstOrDefault().Json.FromAmazonJson() })]));

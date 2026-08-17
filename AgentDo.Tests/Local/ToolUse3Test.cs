@@ -1,4 +1,4 @@
-﻿using AgentDo.OpenAI.Like;
+using AgentDo.OpenAI.Like;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,7 +7,7 @@ using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Local
 {
-	[TestClass]
+	[TestClass, RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 	public sealed class ToolUse3Test
 	{
 		record Person(
@@ -23,6 +23,7 @@ namespace AgentDo.Tests.Local
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 		public async Task LocalAgentMultiToolUse([FromKeyedServices("local")] OpenAILikeClient client, ILoggerFactory loggerFactory)
 		{
 			var systemPrompt = @"Answer the user's request using relevant tools (if they are available). 

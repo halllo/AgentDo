@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
@@ -20,7 +20,10 @@ namespace AgentDo
 		public class PendingToolUsesContext
 		{
 			public string Role { get; set; } = null!;
-			public string Text { get; set; } = null!;
+			/// <summary>Assistant text accompanying the tool use. Often absent - models
+			/// routinely emit tool calls with no preamble - and always absent after a JSON
+			/// round-trip of a message that had none.</summary>
+			public string? Text { get; set; }
 			public Message.Reasoning? Reason { get; set; }
 			public List<ToolUsing.ToolUse> Uses { get; set; } = null!;
 			public Message.GenerationData GenerationData { get; set; } = null!;
@@ -28,7 +31,7 @@ namespace AgentDo
 
 		public ToolUsing.ToolUse? Approvable => PendingToolUses?.Uses.SkipWhile(u => u.ToolResult != null).FirstOrDefault();
 		public bool NeedsApprovalToContinue => Approvable != null;
-		public async Task<AgentResult> ApproveAndContinue(ILogger? logger = null)
+		public async Task<AgentResult> ApproveAndContinue(ILogger? logger = null, Events? events = null, CancellationToken cancellationToken = default)
 		{
 			var use = PendingToolUses?.Uses.SkipWhile(u => u.ToolResult != null).FirstOrDefault();
 			if (use == null)
@@ -40,7 +43,7 @@ namespace AgentDo
 			use.Approved = true;
 
 			var continueTask = new Prompt(Task.Text, Task.Images, Task.Documents, this);
-			var newResult = await Agent.Do(continueTask, Tools);
+			var newResult = await Agent.Do(continueTask, Tools, events, cancellationToken).ConfigureAwait(false);
 			return newResult;
 		}
 

@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -40,9 +40,11 @@ namespace AgentDo.OpenAI.Like
 
 			if (options.Value.LogTask)
 			{
-				logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.ContentArray);
-				var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.ContentArray?.ToString() ?? string.Empty);
-				if (eventTask != null) await eventTask;
+				// Content, not ContentArray: the task message is built from task.Text two lines
+				// above, so ContentArray is always null and this logged nothing at all.
+				logger.LogDebug("{Role}: {Text}", taskMessage.Role, taskMessage.Content);
+				var eventTask = events?.AfterMessage?.Invoke(taskMessage.Role, taskMessage.Content ?? string.Empty);
+				if (eventTask != null) await eventTask.ConfigureAwait(false);
 			}
 
 			var toolDefinitions = new List<OpenAILikeClient.Tool>();
@@ -55,7 +57,7 @@ namespace AgentDo.OpenAI.Like
 			Tool.Context context = new(resultMessages);
 			while (keepConversing)
 			{
-				var completion = await client.ChatCompletion(messages, toolDefinitions, cancellationToken);
+				var completion = await client.ChatCompletion(messages, toolDefinitions, cancellationToken).ConfigureAwait(false);
 				messages.Add(completion.Message);
 
 				var text = completion.Message.Content;
@@ -63,7 +65,7 @@ namespace AgentDo.OpenAI.Like
 				{
 					logger.LogDebug("{Role}: {Text}", completion.Message.Role, text);
 					var eventTask = events?.AfterMessage?.Invoke(completion.Message.Role, text!);
-					if (eventTask != null) await eventTask;
+					if (eventTask != null) await eventTask.ConfigureAwait(false);
 					context.Text = text;
 				}
 
@@ -85,7 +87,7 @@ namespace AgentDo.OpenAI.Like
 								cancellationToken.ThrowIfCancellationRequested();
 								resultMessages.Add(new(completion.Message.Role, text ?? string.Empty, toolCalls: [new Message.ToolCall { Name = toolCall.ToolName, Id = toolCall.ToolUseId, Input = toolCall.ToolInput }], toolResults: null));
 
-								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, events, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken);
+								var (toolResult, requiresApproval) = await ToolUsing.Use(tools, toolCall, completion.Message.Role, context, events, logger, options.Value.IgnoreInvalidSchema, options.Value.IgnoreUnkownTools, cancellationToken).ConfigureAwait(false);
 
 								if (toolResult == null && requiresApproval != null)
 								{

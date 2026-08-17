@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Microsoft.Extensions.Logging;
@@ -14,6 +14,7 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ToolWithInput(IAmazonBedrockRuntime bedrock)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
@@ -36,7 +37,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 			{
-				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+				ModelId = TestModels.Sonnet,
 				Messages = messages,
 				ToolConfig = new ToolConfiguration { Tools = [tool] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
@@ -58,6 +59,7 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ToolWithNoInput(IAmazonBedrockRuntime bedrock)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
@@ -69,7 +71,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var streamResponse = await bedrock.ConverseStreamAsync(new ConverseStreamRequest
 			{
-				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+				ModelId = TestModels.Sonnet,
 				Messages = messages,
 				ToolConfig = new ToolConfiguration { Tools = [tool] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }
@@ -86,9 +88,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task TextToolTextStreaming(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o =>
 			{
 				o.ReasoningBudget = null;
 				o.Streaming = true;

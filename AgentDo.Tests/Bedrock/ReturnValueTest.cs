@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 
@@ -8,11 +8,12 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class ReturnValueTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task AsyncObject(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -29,11 +30,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SyncObject(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -49,11 +51,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SyncList(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -69,11 +72,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task AyncPrimitive(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -90,11 +94,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SyncPrimitive(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -110,11 +115,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task AyncVoid(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -130,11 +136,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SyncVoid(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:

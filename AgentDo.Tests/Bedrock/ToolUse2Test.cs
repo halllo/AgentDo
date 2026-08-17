@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using System.Text.Json;
@@ -13,6 +13,7 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithToolInvocation(IAmazonBedrockRuntime bedrock)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
@@ -29,7 +30,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var response = await bedrock.ConverseAsync(new ConverseRequest
 			{
-				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+				ModelId = TestModels.Sonnet,
 				Messages = messages,
 				ToolConfig = new ToolConfiguration { Tools = [tool.ForBedrock()] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }

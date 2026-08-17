@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using AgentDo.Content;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
@@ -14,9 +14,11 @@ namespace AgentDo.Tests.Bedrock
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, Amount BetragInEuro, string? Waehrung = null, Amount? Betrag = null, string? Kurs = null, Amount? WaehrungsumrechnungInEuro = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, RequiresAsset(TestAssets.CreditCardStatementPng)]
+		[TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithImageAndSelfConvertingSchema(IAmazonBedrockRuntime bedrock)
 		{
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF.0.png"));
+			using var image = Image.From(TestAssets.File(TestAssets.CreditCardStatementPng));
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{
 				ConversationRole.User.Says(Prompt.ClaudeChainOfThought + " Here is my credit card statement.", image.ForBedrock()),
@@ -37,7 +39,7 @@ namespace AgentDo.Tests.Bedrock
 
 			var response = await bedrock.ConverseAsync(new ConverseRequest
 			{
-				ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+				ModelId = TestModels.Sonnet,
 				Messages = messages,
 				ToolConfig = new ToolConfiguration { Tools = [tool] },
 				InferenceConfig = new InferenceConfiguration() { Temperature = 0.0F }

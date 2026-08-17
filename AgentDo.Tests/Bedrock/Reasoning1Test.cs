@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -13,9 +13,10 @@ namespace AgentDo.Tests.Bedrock
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ReasonBeforeToolCall(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o =>
 			{
 				o.ReasoningBudget = 2000;
 				o.Streaming = false;
@@ -45,9 +46,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ReasonBeforeToolCallStreaming(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o =>
 			{
 				o.ReasoningBudget = 2000;
 				o.Streaming = true;
@@ -77,9 +79,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task TextToolTextStreaming(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o =>
 			{
 				o.ReasoningBudget = 1024;
 				o.Streaming = true;
@@ -116,9 +119,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SuspendToolAndResume(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o => o.ReasoningBudget = 2000);
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o => o.ReasoningBudget = 2000);
 
 			Person? registeredPerson = default;
 			var suspended = await agent.Do(
@@ -163,9 +167,10 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task MultipleToolsCallsInSameRun(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o => o.ReasoningBudget = 2000);
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o => o.ReasoningBudget = 2000);
 
 			Person? registeredPerson = default;
 			var result = await agent.Do(

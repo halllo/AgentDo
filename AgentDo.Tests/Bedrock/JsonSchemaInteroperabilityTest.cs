@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 using Amazon.Runtime.Documents;
@@ -15,7 +15,10 @@ namespace AgentDo.Tests.Bedrock
 			[property: System.ComponentModel.Description("The age of the person.")] int Age,
 			[property: System.ComponentModel.Description("The address of the person.")] Address? Address = null);
 
-		record Address(string Street, string City);
+		// Street is optional: the prompt below only mentions a city, and the test asserts
+		// that Street comes back null. Declaring it required would oblige the model to
+		// invent one (or to ask for it instead of calling the tool).
+		record Address(string City, string? Street = null);
 
 		JsonObject personSchemaJsonObject = new JsonObject
 		{
@@ -47,7 +50,7 @@ namespace AgentDo.Tests.Bedrock
 							["type"] = "string"
 						}
 					},
-					["required"] = new JsonArray("street", "city"),
+					["required"] = new JsonArray("city"),
 					["default"] = null,
 				}
 			},
@@ -141,18 +144,21 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithManualAmazonJsonSchema(IAmazonBedrockRuntime bedrock)
 		{
 			await ConverseRegisteringAPerson(bedrock, personSchemaAmazonJson);
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithManualJsonSchema(IAmazonBedrockRuntime bedrock)
 		{
 			await ConverseRegisteringAPerson(bedrock, personSchemaJsonObject.ToAmazonJson());
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task BedrockConverseWithAutoJsonSchema(IAmazonBedrockRuntime bedrock)
 		{
 			await ConverseRegisteringAPerson(bedrock, JsonSchemaExtensions.JsonSchemaString<Person>().ToAmazonJson());
@@ -175,10 +181,10 @@ namespace AgentDo.Tests.Bedrock
 
 			var responseMessage = response.Output.Message;
 
-			var text = responseMessage.Content[0].Text;
+			var text = responseMessage.Content.FirstOrDefault(c => c.Text != null)?.Text;
 			Console.WriteLine(text);
 
-			var toolUse = responseMessage.Content[1].ToolUse;
+			var toolUse = responseMessage.Content.First(c => c.ToolUse != null).ToolUse;
 			var person = toolUse.Input.FromAmazonJson<Person>()!;
 			Console.WriteLine(JsonSerializer.Serialize(person));
 

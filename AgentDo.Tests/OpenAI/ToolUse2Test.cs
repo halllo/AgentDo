@@ -1,4 +1,4 @@
-﻿using AgentDo.OpenAI;
+using AgentDo.OpenAI;
 using OpenAI.Chat;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
@@ -12,6 +12,7 @@ namespace AgentDo.Tests.OpenAI
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresOpenAI, TestCategory(TestCategories.OpenAI)]
 		public async Task OpenAICompletionWithToolInvocation(ChatClient client)
 		{
 			List<ChatMessage> messages =

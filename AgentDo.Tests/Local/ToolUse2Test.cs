@@ -1,11 +1,11 @@
-﻿using AgentDo.OpenAI.Like;
+using AgentDo.OpenAI.Like;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace AgentDo.Tests.Local
 {
-	[TestClass]
+	[TestClass, RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 	public sealed class ToolUse2Test
 	{
 		record Person(
@@ -19,6 +19,7 @@ namespace AgentDo.Tests.Local
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresLocalLlm, TestCategory(TestCategories.LocalLlm)]
 		public async Task LocalCompletionToolInvocation([FromKeyedServices("local")] OpenAILikeClient client)
 		{
 			OpenAILikeClient.Message[] messages =

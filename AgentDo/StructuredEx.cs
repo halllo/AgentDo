@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 
 namespace AgentDo
 {
@@ -18,7 +18,7 @@ namespace AgentDo
 						context.Suspend();
 					}),
 				],
-				cancellationToken: cancellationToken);
+				cancellationToken: cancellationToken).ConfigureAwait(false);
 
 			if (!assessed) throw new InvalidOperationException(result.Messages.Last().Text);
 			else return t!;

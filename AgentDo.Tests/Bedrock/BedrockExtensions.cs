@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Amazon.BedrockRuntime.Model;
 
@@ -23,7 +23,7 @@ namespace AgentDo.Tests.Bedrock
 			return (BedrockAgent.GetAsToolResultMessage(toolUse.ToolUseId, result.Item1?.Result), result.Item2);
 		}
 
-		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = "anthropic.claude-3-sonnet-20240229-v1:0")
+		public static async Task<ConverseResponse> ConverseWithTool(this IAmazonBedrockRuntime bedrock, string prompt, Amazon.BedrockRuntime.Model.Tool tool, string modelId = TestModels.Sonnet)
 		{
 			var messages = new List<Amazon.BedrockRuntime.Model.Message>
 			{

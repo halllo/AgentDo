@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using AgentDo.OpenAI.Like;
 using Microsoft.Extensions.DependencyInjection;
 using System.Globalization;
@@ -19,9 +19,11 @@ namespace AgentDo.Tests.Local
 			string? Bic = null);
 
 		[TestMethodWithDI]
+		[RequiresLocalLlm, RequiresAsset(TestAssets.InvoicePng)]
+		[TestCategory(TestCategories.LocalLlm)]
 		public async Task LocalWithImageAndSelfConvertingSchema([FromKeyedServices("local")] OpenAILikeClient client)
 		{
-			using var image = Image.From(new FileInfo(@"C:\Users\manue\Downloads\Inbox\Rechnung_2241198869.pdf.0.png"));
+			using var image = Image.From(TestAssets.File(TestAssets.InvoicePng));
 
 			OpenAILikeClient.Message[] messages =
 			[

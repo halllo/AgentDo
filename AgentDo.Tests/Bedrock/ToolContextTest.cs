@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -9,11 +9,12 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class ToolContextTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task ContextArgumentIsIgnored(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			var messages = await agent.Do(
 				task: "Call f with argument 'hello'.",
 				tools:
@@ -29,11 +30,12 @@ namespace AgentDo.Tests.Bedrock
 		}
 
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task EndingAgentLoopViaContext(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var fCalls = new List<string>();
 
-			var agent = bedrock.AsAgent(loggerFactory, "anthropic.claude-3-5-sonnet-20240620-v1:0");
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.Sonnet);
 			var messages = await agent.Do(
 				task: "Call f1 and then f2, one after the other, each with argument 'hello'.",
 				tools:

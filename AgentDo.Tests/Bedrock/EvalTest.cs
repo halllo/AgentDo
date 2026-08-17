@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,6 +10,7 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class EvalTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task BoolEval(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
 			var judge = new BedrockAgent(
@@ -17,7 +18,7 @@ namespace AgentDo.Tests.Bedrock
 				logger: loggerFactory.CreateLogger<BedrockAgent>(),
 				options: Options.Create(new BedrockAgentOptions
 				{
-					ModelId = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+					ModelId = TestModels.Sonnet,
 					Temperature = 0.0F
 				}));
 
@@ -28,13 +29,17 @@ namespace AgentDo.Tests.Bedrock
 				Assert.AreEqual(affirmative, eval.Affirmative, eval.Explanation);
 			}
 
-			await evaluate("Did the assistant's answer address the user's question?",
+			// Judge topical relevance only. Asking whether the answer "addressed" the question
+			// invites the judge to rule on whether the assistant could actually know the weather.
+			await evaluate("Is the assistant's answer topically relevant to what the user asked about? Judge only topical relevance, not factual correctness or whether the assistant could know the answer.",
 			[
 				new Message { Role = "user", Text = "Whats the weather today?" },
 				new Message { Role = "assistant", Text = "It is cloudy and 15 degrees Celsius." },
 			], affirmative: true);
 
-			await evaluate("Did the assistant's answer address the user's question?",
+			// Judge topical relevance only. Asking whether the answer "addressed" the question
+			// invites the judge to rule on whether the assistant could actually know the weather.
+			await evaluate("Is the assistant's answer topically relevant to what the user asked about? Judge only topical relevance, not factual correctness or whether the assistant could know the answer.",
 			[
 				new Message { Role = "user", Text = "Whats the weather today?" },
 				new Message { Role = "assistant", Text = "Today is Sunday." },

@@ -1,4 +1,4 @@
-﻿using AgentDo.Bedrock;
+using AgentDo.Bedrock;
 using Amazon.BedrockRuntime;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -9,9 +9,10 @@ namespace AgentDo.Tests.Bedrock
 	public sealed class SystemPromptTest
 	{
 		[TestMethodWithDI]
+		[RequiresBedrock, TestCategory(TestCategories.Bedrock)]
 		public async Task SystemPrompt(IAmazonBedrockRuntime bedrock, ILoggerFactory loggerFactory)
 		{
-			var agent = bedrock.AsAgent(loggerFactory, "eu.anthropic.claude-sonnet-4-20250514-v1:0", o =>
+			var agent = bedrock.AsAgent(loggerFactory, TestModels.SonnetWithReasoning, o =>
 			{
 				o.ReasoningBudget = 2000;
 				o.Streaming = false;

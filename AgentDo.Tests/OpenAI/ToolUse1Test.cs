@@ -1,4 +1,4 @@
-﻿using OpenAI.Chat;
+using OpenAI.Chat;
 using System.Text.Json;
 
 namespace AgentDo.Tests.OpenAI
@@ -10,6 +10,7 @@ namespace AgentDo.Tests.OpenAI
 		record Address(string City, string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresOpenAI, TestCategory(TestCategories.OpenAI)]
 		public async Task OpenAICompletionWithReflectedToolAndReflectedResponse(ChatClient client)
 		{
 			List<ChatMessage> messages =

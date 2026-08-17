@@ -1,4 +1,4 @@
-﻿using AgentDo.Content;
+using AgentDo.Content;
 using OpenAI.Chat;
 using System.Text.Json;
 
@@ -11,9 +11,11 @@ namespace AgentDo.Tests.OpenAI
 		record Booking(DateTime BelegDatum, DateTime BuchungsDatum, string Zweck, decimal BetragInEuro, string? Waehrung = null, decimal? Betrag = null, string? Kurs = null, decimal? WaehrungsumrechnungInEuro = null, bool Positive = false);
 
 		[TestMethodWithDI]
+		[RequiresOpenAI, RequiresAsset(TestAssets.CreditCardStatementPdf)]
+		[TestCategory(TestCategories.OpenAI)]
 		public async Task OpenAIConverseWithDocumentAndSchemaAndSeparateDeserialized(ChatClient client)
 		{
-			var pdf = new FileInfo(@"C:\Users\manue\Downloads\Inbox\5232xxxxxxxx7521_Abrechnung_vom_14_02_2025_Naujoks_Manuel.PDF");
+			var pdf = TestAssets.File(TestAssets.CreditCardStatementPdf);
 			using var pdfStream = new MemoryStream(File.ReadAllBytes(pdf.FullName));
 
 			List<ChatMessage> messages =

@@ -1,4 +1,4 @@
-﻿using AgentDo.OpenAI;
+using AgentDo.OpenAI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
@@ -22,6 +22,7 @@ namespace AgentDo.Tests.OpenAI
 			string? Street = null);
 
 		[TestMethodWithDI]
+		[RequiresOpenAI, TestCategory(TestCategories.OpenAI)]
 		public async Task OpenAIAgentMultiToolUseWithApproval(ChatClient client, ILoggerFactory loggerFactory)
 		{
 			var agent = new OpenAIAgent(

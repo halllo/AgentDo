@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -80,10 +80,16 @@ namespace AgentDo.OpenAI.Like
 			var jsonContent = JsonSerializer.Serialize(content, snakeCaseLower);
 			var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-			var response = await http.PostAsync("v1/chat/completions", httpContent, cancellationToken);
-			response.EnsureSuccessStatusCode();
+			var response = await http.PostAsync("v1/chat/completions", httpContent, cancellationToken).ConfigureAwait(false);
 
-			var responseBody = await response.Content.ReadAsStringAsync();
+			var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+			if (!response.IsSuccessStatusCode)
+			{
+				// EnsureSuccessStatusCode alone would throw away the body, which is where an
+				// OpenAI-compatible server puts the reason it rejected the request.
+				throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase} from {http.BaseAddress}v1/chat/completions: {responseBody}");
+			}
+
 			return JsonSerializer.Deserialize<CompletionResponseRaw>(responseBody, snakeCaseLower)!.Choices.Single();
 		}
 
